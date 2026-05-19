@@ -1,0 +1,39 @@
+{
+    "name": "ChordBase",
+    "short_name": "ChordBase",
+    "id": "/",
+    "start_url": ".",
+    "scope": ".",
+    "display": "standalone",
+    "background_color": "#0B1117",
+    "theme_color": "#0B1117",
+    "description": "ChordBase - cifras, setlists e repertorios para ensaio e palco.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

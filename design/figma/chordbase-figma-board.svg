@@ -1,0 +1,213 @@
+<svg width="1920" height="1380" viewBox="0 0 1920 1380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0b1117"/>
+      <stop offset="1" stop-color="#101820"/>
+    </linearGradient>
+    <linearGradient id="surface" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#17212a"/>
+      <stop offset="1" stop-color="#0f171e"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ff6a57"/>
+      <stop offset="1" stop-color="#f04438"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#31d6c6"/>
+      <stop offset="1" stop-color="#0ea5a4"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .title { font: 700 42px Inter, Arial, sans-serif; fill: #f7fafc; letter-spacing: 0; }
+      .subtitle { font: 500 18px Inter, Arial, sans-serif; fill: #9aa7b2; letter-spacing: 0; }
+      .h1 { font: 800 26px Inter, Arial, sans-serif; fill: #f8fafc; letter-spacing: 0; }
+      .h2 { font: 700 18px Inter, Arial, sans-serif; fill: #f8fafc; letter-spacing: 0; }
+      .body { font: 500 14px Inter, Arial, sans-serif; fill: #9aa7b2; letter-spacing: 0; }
+      .small { font: 600 12px Inter, Arial, sans-serif; fill: #7e8b96; letter-spacing: 0; }
+      .tab { font: 700 11px Inter, Arial, sans-serif; fill: #6f7d88; letter-spacing: 0; }
+      .tabActive { font: 800 11px Inter, Arial, sans-serif; fill: #31d6c6; letter-spacing: 0; }
+      .button { font: 800 15px Inter, Arial, sans-serif; fill: #0b1117; letter-spacing: 0; }
+      .chip { font: 700 12px Inter, Arial, sans-serif; fill: #f8fafc; letter-spacing: 0; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1380" fill="url(#bg)"/>
+  <text x="80" y="86" class="title">ChordBase design board</text>
+  <text x="80" y="122" class="subtitle">Mobile iOS/Android + Web direction using the chosen C chord identity</text>
+
+  <g transform="translate(80 170)">
+    <rect width="360" height="170" rx="28" fill="url(#surface)" stroke="#263541"/>
+    <text x="28" y="42" class="h2">Visual identity</text>
+    <text x="28" y="70" class="body">Core mark: C + chord diagram</text>
+    <circle cx="54" cy="114" r="18" fill="#101820" stroke="#263541"/>
+    <circle cx="102" cy="114" r="18" fill="#ff5a4d"/>
+    <circle cx="150" cy="114" r="18" fill="#19c7ba"/>
+    <circle cx="198" cy="114" r="18" fill="#f6b83f"/>
+    <circle cx="246" cy="114" r="18" fill="#248cf0"/>
+    <text x="28" y="154" class="small">Ink, coral, teal, warm accent, blue state</text>
+  </g>
+
+  <g transform="translate(480 170)">
+    <rect width="360" height="170" rx="28" fill="url(#surface)" stroke="#263541"/>
+    <text x="28" y="42" class="h2">Navigation</text>
+    <text x="28" y="70" class="body">Mobile: bottom tabs</text>
+    <text x="28" y="96" class="body">Web: left sidebar + content grid</text>
+    <text x="28" y="132" class="small">Home, Cifras, Setlists, Perfil</text>
+  </g>
+
+  <g transform="translate(880 170)">
+    <rect width="360" height="170" rx="28" fill="url(#surface)" stroke="#263541"/>
+    <text x="28" y="42" class="h2">Product mood</text>
+    <text x="28" y="70" class="body">Social musical, modern, dark UI</text>
+    <text x="28" y="96" class="body">Fast access for rehearsal and library work</text>
+    <text x="28" y="132" class="small">Cards only for repeated content</text>
+  </g>
+
+  <!-- Reusable app mark approximation -->
+  <g id="appMark" transform="translate(1320 156)">
+    <rect width="160" height="160" rx="38" fill="#111a22" stroke="#2a3a46" filter="url(#shadow)"/>
+    <path d="M111 46C101 34 85 28 67 31C42 35 24 55 24 82C24 110 43 130 70 133C87 135 102 128 112 117" stroke="url(#coral)" stroke-width="24" stroke-linecap="square"/>
+    <line x1="58" y1="54" x2="58" y2="112" stroke="#e7edf2" stroke-width="4"/>
+    <line x1="78" y1="54" x2="78" y2="112" stroke="#e7edf2" stroke-width="4"/>
+    <line x1="98" y1="54" x2="98" y2="112" stroke="#e7edf2" stroke-width="4"/>
+    <line x1="48" y1="66" x2="108" y2="66" stroke="#e7edf2" stroke-width="4"/>
+    <line x1="48" y1="86" x2="108" y2="86" stroke="#e7edf2" stroke-width="4"/>
+    <line x1="48" y1="106" x2="108" y2="106" stroke="#e7edf2" stroke-width="4"/>
+    <circle cx="58" cy="102" r="8" fill="#248cf0"/>
+    <circle cx="78" cy="86" r="8" fill="#f6b83f"/>
+    <circle cx="98" cy="70" r="8" fill="#31d6c6"/>
+  </g>
+  <text x="1508" y="238" class="h2">Selected icon direction</text>
+  <text x="1508" y="266" class="body">chordbase-icon-c-acorde-sem-xo</text>
+
+  <!-- Mobile frame: login -->
+  <g transform="translate(80 400)" filter="url(#shadow)">
+    <rect width="300" height="620" rx="36" fill="#0c1218" stroke="#263541" stroke-width="2"/>
+    <rect x="18" y="18" width="264" height="584" rx="28" fill="#111a22"/>
+    <g transform="translate(96 72) scale(0.68)">
+      <rect width="160" height="160" rx="38" fill="#111a22" stroke="#2a3a46"/>
+      <path d="M111 46C101 34 85 28 67 31C42 35 24 55 24 82C24 110 43 130 70 133C87 135 102 128 112 117" stroke="url(#coral)" stroke-width="24" stroke-linecap="square"/>
+      <line x1="58" y1="54" x2="58" y2="112" stroke="#e7edf2" stroke-width="4"/>
+      <line x1="78" y1="54" x2="78" y2="112" stroke="#e7edf2" stroke-width="4"/>
+      <line x1="98" y1="54" x2="98" y2="112" stroke="#e7edf2" stroke-width="4"/>
+      <line x1="48" y1="66" x2="108" y2="66" stroke="#e7edf2" stroke-width="4"/>
+      <line x1="48" y1="86" x2="108" y2="86" stroke="#e7edf2" stroke-width="4"/>
+      <line x1="48" y1="106" x2="108" y2="106" stroke="#e7edf2" stroke-width="4"/>
+      <circle cx="58" cy="102" r="8" fill="#248cf0"/>
+      <circle cx="78" cy="86" r="8" fill="#f6b83f"/>
+      <circle cx="98" cy="70" r="8" fill="#31d6c6"/>
+    </g>
+    <text x="44" y="242" class="h1">Entre no ChordBase</text>
+    <text x="44" y="270" class="body">Sua biblioteca de cifras e setlists.</text>
+    <rect x="36" y="318" width="228" height="52" rx="14" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="350" class="body">email@exemplo.com</text>
+    <rect x="36" y="386" width="228" height="52" rx="14" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="418" class="body">Senha</text>
+    <rect x="36" y="462" width="228" height="54" rx="16" fill="url(#teal)"/>
+    <text x="124" y="495" class="button">Entrar</text>
+    <text x="76" y="548" class="body">Criar nova conta</text>
+  </g>
+
+  <!-- Mobile frame: home -->
+  <g transform="translate(430 400)" filter="url(#shadow)">
+    <rect width="300" height="620" rx="36" fill="#0c1218" stroke="#263541" stroke-width="2"/>
+    <rect x="18" y="18" width="264" height="584" rx="28" fill="#111a22"/>
+    <text x="36" y="68" class="small">Boa noite, Gabriel</text>
+    <text x="36" y="102" class="h1">Seu repertorio</text>
+    <rect x="36" y="128" width="228" height="96" rx="20" fill="#17222b" stroke="#263541"/>
+    <text x="56" y="164" class="h2">Set de domingo</text>
+    <text x="56" y="192" class="body">12 cifras • 3 colaboradores</text>
+    <rect x="212" y="152" width="34" height="34" rx="17" fill="#31d6c6"/>
+    <text x="36" y="270" class="h2">Acoes rapidas</text>
+    <rect x="36" y="292" width="104" height="84" rx="18" fill="#17222b" stroke="#263541"/>
+    <text x="58" y="342" class="chip">Upload</text>
+    <rect x="160" y="292" width="104" height="84" rx="18" fill="#17222b" stroke="#263541"/>
+    <text x="184" y="342" class="chip">Buscar</text>
+    <text x="36" y="424" class="h2">Recentes</text>
+    <rect x="36" y="446" width="228" height="56" rx="16" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="480" class="body">Oceans • Hillsong</text>
+    <rect x="36" y="515" width="228" height="66" rx="20" fill="#0b1117" stroke="#263541"/>
+    <text x="52" y="559" class="tabActive">Home</text>
+    <text x="105" y="559" class="tab">Cifras</text>
+    <text x="164" y="559" class="tab">Setlists</text>
+    <text x="230" y="559" class="tab">Perfil</text>
+  </g>
+
+  <!-- Mobile frame: cifras -->
+  <g transform="translate(780 400)" filter="url(#shadow)">
+    <rect width="300" height="620" rx="36" fill="#0c1218" stroke="#263541" stroke-width="2"/>
+    <rect x="18" y="18" width="264" height="584" rx="28" fill="#111a22"/>
+    <text x="36" y="70" class="h1">Cifras</text>
+    <rect x="36" y="98" width="228" height="46" rx="14" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="126" class="body">Buscar musica ou artista</text>
+    <rect x="36" y="170" width="228" height="102" rx="20" fill="#17222b" stroke="#263541"/>
+    <text x="56" y="206" class="h2">Adicionar cifra</text>
+    <text x="56" y="234" class="body">PDF, imagem ou texto ChordPro</text>
+    <rect x="200" y="206" width="42" height="42" rx="21" fill="url(#coral)"/>
+    <text x="36" y="320" class="h2">Biblioteca</text>
+    <rect x="36" y="344" width="228" height="58" rx="16" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="368" class="chip">Tua Graca Me Basta</text>
+    <text x="54" y="390" class="small">Toque no Altar</text>
+    <rect x="36" y="414" width="228" height="58" rx="16" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="438" class="chip">So Tu Es Santo</text>
+    <text x="54" y="460" class="small">Morada</text>
+    <rect x="36" y="515" width="228" height="66" rx="20" fill="#0b1117" stroke="#263541"/>
+    <text x="52" y="559" class="tab">Home</text>
+    <text x="105" y="559" class="tabActive">Cifras</text>
+    <text x="164" y="559" class="tab">Setlists</text>
+    <text x="230" y="559" class="tab">Perfil</text>
+  </g>
+
+  <!-- Mobile frame: setlists -->
+  <g transform="translate(1130 400)" filter="url(#shadow)">
+    <rect width="300" height="620" rx="36" fill="#0c1218" stroke="#263541" stroke-width="2"/>
+    <rect x="18" y="18" width="264" height="584" rx="28" fill="#111a22"/>
+    <text x="36" y="70" class="h1">Setlists</text>
+    <rect x="206" y="42" width="58" height="42" rx="14" fill="url(#teal)"/>
+    <text x="228" y="69" class="button">+</text>
+    <rect x="36" y="110" width="228" height="128" rx="20" fill="#17222b" stroke="#263541"/>
+    <text x="56" y="146" class="h2">Ensaio sexta</text>
+    <text x="56" y="174" class="body">8 cifras • privado</text>
+    <rect x="56" y="196" width="72" height="24" rx="12" fill="#263541"/>
+    <text x="73" y="213" class="small">PRIVATE</text>
+    <rect x="36" y="260" width="228" height="128" rx="20" fill="#17222b" stroke="#263541"/>
+    <text x="56" y="296" class="h2">Culto domingo</text>
+    <text x="56" y="324" class="body">12 cifras • colaborativo</text>
+    <rect x="56" y="346" width="112" height="24" rx="12" fill="#1f3f43"/>
+    <text x="72" y="363" class="small">COLLABORATIVE</text>
+    <text x="36" y="432" class="h2">Convites</text>
+    <rect x="36" y="454" width="228" height="48" rx="16" fill="#0b1117" stroke="#263541"/>
+    <text x="54" y="484" class="body">Banda ChordBase</text>
+    <rect x="36" y="515" width="228" height="66" rx="20" fill="#0b1117" stroke="#263541"/>
+    <text x="52" y="559" class="tab">Home</text>
+    <text x="105" y="559" class="tab">Cifras</text>
+    <text x="164" y="559" class="tabActive">Setlists</text>
+    <text x="230" y="559" class="tab">Perfil</text>
+  </g>
+
+  <!-- Web frame -->
+  <g transform="translate(80 1080)">
+    <rect width="1760" height="230" rx="30" fill="#0c1218" stroke="#263541" filter="url(#shadow)"/>
+    <rect x="22" y="22" width="210" height="186" rx="22" fill="#111a22" stroke="#263541"/>
+    <text x="48" y="64" class="h2">ChordBase</text>
+    <text x="48" y="102" class="tabActive">Home</text>
+    <text x="48" y="132" class="tab">Cifras</text>
+    <text x="48" y="162" class="tab">Setlists</text>
+    <text x="48" y="192" class="tab">Perfil</text>
+    <text x="270" y="66" class="h1">Dashboard web</text>
+    <text x="270" y="94" class="body">Mesma estrutura do mobile, com mais densidade e navegacao lateral.</text>
+    <rect x="270" y="124" width="300" height="66" rx="18" fill="#17222b" stroke="#263541"/>
+    <text x="292" y="164" class="h2">12 cifras</text>
+    <rect x="594" y="124" width="300" height="66" rx="18" fill="#17222b" stroke="#263541"/>
+    <text x="616" y="164" class="h2">4 setlists</text>
+    <rect x="918" y="124" width="300" height="66" rx="18" fill="#17222b" stroke="#263541"/>
+    <text x="940" y="164" class="h2">2 convites</text>
+    <rect x="1242" y="58" width="460" height="132" rx="22" fill="#111a22" stroke="#263541"/>
+    <text x="1266" y="98" class="h2">Proximo repertorio</text>
+    <text x="1266" y="128" class="body">Culto domingo • 12 musicas • 3 colaboradores</text>
+    <rect x="1266" y="150" width="130" height="32" rx="16" fill="url(#teal)"/>
+    <text x="1298" y="171" class="button">Abrir</text>
+  </g>
+</svg>
