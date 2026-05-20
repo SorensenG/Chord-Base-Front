@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/profile_avatar.dart';
@@ -43,7 +44,7 @@ class AdminScreen extends ConsumerWidget {
                     EmptyState(
                       icon: Icons.admin_panel_settings_rounded,
                       title: 'Nao foi possivel carregar usuarios',
-                      message: error.toString(),
+                      message: userMessage(error),
                     ),
                   ],
                 ),
@@ -185,7 +186,7 @@ class _UsersList extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 
@@ -202,7 +203,7 @@ class _UsersList extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 
@@ -265,7 +266,7 @@ class _UsersList extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 }
@@ -298,7 +299,7 @@ class AdminUserDetailScreen extends ConsumerWidget {
               error: (error, _) => EmptyState(
                 icon: Icons.error_outline_rounded,
                 title: 'Erro ao carregar cifras',
-                message: error.toString(),
+                message: userMessage(error),
               ),
               data: (items) => _AdminChordList(user: user, items: items),
             ),
@@ -307,7 +308,7 @@ class AdminUserDetailScreen extends ConsumerWidget {
               error: (error, _) => EmptyState(
                 icon: Icons.error_outline_rounded,
                 title: 'Erro ao carregar setlists',
-                message: error.toString(),
+                message: userMessage(error),
               ),
               data: (items) => _AdminSetlistList(user: user, items: items),
             ),
@@ -375,7 +376,7 @@ class _AdminChordList extends ConsumerWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text(error.toString())));
+                    ).showSnackBar(SnackBar(content: Text(userMessage(error))));
                   }
                   return false;
                 }
@@ -459,7 +460,7 @@ class _AdminSetlistList extends ConsumerWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text(error.toString())));
+                    ).showSnackBar(SnackBar(content: Text(userMessage(error))));
                   }
                   return false;
                 }

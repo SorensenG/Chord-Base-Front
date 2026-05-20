@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/profile_avatar.dart';
@@ -57,6 +58,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
     ];
     final wide = MediaQuery.sizeOf(context).width >= 820;
+    final colors = context.appColors;
 
     return Scaffold(
       body: Row(
@@ -75,7 +77,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ? null
           : NavigationBar(
               selectedIndex: _index,
-              backgroundColor: AppColors.surface,
+              backgroundColor: colors.surface,
               indicatorColor: AppColors.teal.withValues(alpha: 0.16),
               onDestinationSelected: (value) => setState(() => _index = value),
               destinations: [
@@ -132,11 +134,12 @@ class _SideBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       width: 244,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(right: BorderSide(color: AppColors.line)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(right: BorderSide(color: colors.line)),
       ),
       child: SafeArea(
         child: Padding(
@@ -165,9 +168,9 @@ class _SideBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.surface2,
+                  color: colors.surface2,
                   borderRadius: BorderRadius.circular(AppRadii.lg),
-                  border: Border.all(color: AppColors.line),
+                  border: Border.all(color: colors.line),
                 ),
                 child: Row(
                   children: [
@@ -191,10 +194,7 @@ class _SideBar extends StatelessWidget {
                             user.email,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: colors.muted, fontSize: 12),
                           ),
                         ],
                       ),
@@ -223,7 +223,8 @@ class _SideBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.text : AppColors.muted;
+    final colors = context.appColors;
+    final color = selected ? colors.text : colors.muted;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
@@ -275,6 +276,8 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
+    final themePreference = ref.watch(themeModeControllerProvider);
     return AppScaffold(
       body: ListView(
         padding: const EdgeInsets.all(24),
@@ -295,9 +298,9 @@ class ProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.surface2,
+              color: colors.surface2,
               borderRadius: BorderRadius.circular(AppRadii.lg),
-              border: Border.all(color: AppColors.line),
+              border: Border.all(color: colors.line),
             ),
             child: Row(
               children: [
@@ -330,18 +333,70 @@ class ProfileScreen extends ConsumerWidget {
                         user.userName,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                      Text(
-                        user.email,
-                        style: const TextStyle(color: AppColors.muted),
-                      ),
+                      Text(user.email, style: TextStyle(color: colors.muted)),
+                      if (user.description != null &&
+                          user.description!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          user.description!,
+                          style: TextStyle(color: colors.muted),
+                        ),
+                      ],
                       const SizedBox(height: 14),
-                      OutlinedButton.icon(
-                        onPressed: () => _pickProfileImage(ref),
-                        icon: const Icon(Icons.photo_rounded),
-                        label: const Text('Alterar foto'),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _pickProfileImage(ref),
+                            icon: const Icon(Icons.photo_rounded),
+                            label: const Text('Alterar foto'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _editProfile(context, ref, user),
+                            icon: const Icon(Icons.edit_note_rounded),
+                            label: const Text('Editar perfil'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colors.surface2,
+              borderRadius: BorderRadius.circular(AppRadii.lg),
+              border: Border.all(color: colors.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Aparencia',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Escolha o tema do app neste dispositivo.',
+                  style: TextStyle(color: colors.muted),
+                ),
+                const SizedBox(height: 14),
+                SegmentedButton<AppThemePreference>(
+                  segments: [
+                    for (final item in AppThemePreference.values)
+                      ButtonSegment(value: item, label: Text(item.label)),
+                  ],
+                  selected: {themePreference},
+                  onSelectionChanged: (values) {
+                    ref
+                        .read(themeModeControllerProvider.notifier)
+                        .setPreference(values.single);
+                  },
                 ),
               ],
             ),
@@ -355,5 +410,53 @@ class ProfileScreen extends ConsumerWidget {
     final image = await pickProfileImageDataUrl();
     if (image == null) return;
     await ref.read(authControllerProvider.notifier).updateProfileImage(image);
+  }
+
+  Future<void> _editProfile(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile user,
+  ) async {
+    final controller = TextEditingController(text: user.description ?? '');
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar perfil'),
+        content: TextField(
+          controller: controller,
+          minLines: 4,
+          maxLines: 6,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            labelText: 'Descricao',
+            hintText:
+                'Compartilhe um pouco sobre voce, sua trajetoria na musica e seus gostos.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null) return;
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .updateProfile(
+            profileImageUrl: user.profileImageUrl,
+            description: result.isEmpty ? null : result,
+          );
+    } catch (error) {
+      if (!context.mounted) return;
+      showUserMessage(context, error);
+    }
   }
 }

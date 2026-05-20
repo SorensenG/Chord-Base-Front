@@ -54,6 +54,7 @@ class AuthRepository {
         userName: jsonText(data, 'userName'),
         email: email,
         profileImageUrl: jsonNullableText(data, 'profileImageUrl'),
+        description: jsonNullableText(data, 'description'),
         roles: jsonStringList(data, 'roles'),
         active: jsonBool(data, 'active', fallback: true),
       ),
@@ -66,6 +67,7 @@ class AuthRepository {
     required String email,
     required String password,
     String? profileImageUrl,
+    String? description,
   }) async {
     await _api.post<Map<String, dynamic>>(
       '/users/register',
@@ -75,16 +77,28 @@ class AuthRepository {
         'password': password,
         'role': 'ROLE_USER',
         'profileImageUrl': profileImageUrl,
+        'description': description,
       },
     );
   }
 
-  Future<UserProfile> updateProfileImage(String? profileImageUrl) async {
+  Future<UserProfile> updateProfile({
+    required String? profileImageUrl,
+    required String? description,
+  }) async {
     final response = await _api.put<Map<String, dynamic>>(
-      '/users/me/profile-image',
-      data: {'profileImageUrl': profileImageUrl},
+      '/users/me/profile',
+      data: {'profileImageUrl': profileImageUrl, 'description': description},
     );
     return UserProfile.fromJson(response.data!);
+  }
+
+  Future<UserProfile> updateProfileImage(String? profileImageUrl) async {
+    final current = await me();
+    return updateProfile(
+      profileImageUrl: profileImageUrl,
+      description: current.description,
+    );
   }
 
   Future<UserProfile> me() async {
@@ -177,6 +191,7 @@ class AuthController extends StateNotifier<AsyncValue<UserProfile?>> {
     String email,
     String password, {
     String? profileImageUrl,
+    String? description,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
@@ -185,22 +200,37 @@ class AuthController extends StateNotifier<AsyncValue<UserProfile?>> {
         email: email,
         password: password,
         profileImageUrl: profileImageUrl,
+        description: description,
       );
       final session = await _repository.login(email: email, password: password);
       return session.user;
     });
   }
 
-  Future<void> updateProfileImage(String? profileImageUrl) async {
+  Future<void> updateProfile({
+    required String? profileImageUrl,
+    required String? description,
+  }) async {
     final current = state.whenOrNull(data: (user) => user);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final user = await _repository.updateProfileImage(profileImageUrl);
+      final user = await _repository.updateProfile(
+        profileImageUrl: profileImageUrl,
+        description: description,
+      );
       return user;
     });
     if (state.hasError && current != null) {
       state = AsyncValue.data(current);
     }
+  }
+
+  Future<void> updateProfileImage(String? profileImageUrl) async {
+    final current = state.whenOrNull(data: (user) => user);
+    await updateProfile(
+      profileImageUrl: profileImageUrl,
+      description: current?.description,
+    );
   }
 
   Future<void> google() async {

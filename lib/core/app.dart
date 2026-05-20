@@ -4,20 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
+import 'user_messages.dart';
 import '../features/auth/auth_repository.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/shell/app_shell.dart';
 import 'theme.dart';
 
-class ChordBaseApp extends StatelessWidget {
+class ChordBaseApp extends ConsumerWidget {
   const ChordBaseApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themePreference = ref.watch(themeModeControllerProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'ChordBase',
-      theme: buildTheme(),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: themePreference.themeMode,
       home: const AuthGate(),
     );
   }
@@ -36,7 +40,7 @@ class AuthGate extends ConsumerWidget {
     return auth.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => AuthScreen(initialError: error.toString()),
+      error: (error, _) => AuthScreen(initialError: userMessage(error)),
       data: (user) => user == null ? const AuthScreen() : AppShell(user: user),
     );
   }

@@ -10,6 +10,7 @@ import '../../core/models.dart';
 import '../../core/api_client.dart';
 import '../../core/recent_activity_store.dart';
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../auth/auth_repository.dart';
@@ -91,7 +92,7 @@ Future<String?> runChordImportFlow(
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(error.toString())));
+    ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     return null;
   }
 }
@@ -172,7 +173,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
               error: (error, _) => EmptyState(
                 icon: Icons.error_outline_rounded,
                 title: 'Nao foi possivel carregar suas cifras',
-                message: error.toString(),
+                message: userMessage(error),
               ),
               data: (items) {
                 final filtered = _applyFilter(items, filter);
@@ -201,7 +202,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
               error: (error, _) => EmptyState(
                 icon: Icons.search_off_rounded,
                 title: 'Nao foi possivel buscar',
-                message: error.toString(),
+                message: userMessage(error),
               ),
               data: (items) {
                 final filtered = _applyFilter(items, filter);
@@ -268,7 +269,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 
@@ -283,7 +284,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 }
@@ -475,7 +476,7 @@ class _ChordEditScreenState extends ConsumerState<ChordEditScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 }
@@ -610,7 +611,7 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 }
@@ -701,7 +702,7 @@ class _ChordPlayerLoaderState extends ConsumerState<ChordPlayerLoader> {
               : 'Nao foi possivel abrir',
           message: _isUnauthorized(error)
               ? 'Entre novamente para abrir esta cifra.'
-              : error.toString(),
+              : userMessage(error),
         ),
       ),
       data: (chord) {

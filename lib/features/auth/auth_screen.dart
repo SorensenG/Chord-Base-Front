@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/profile_avatar.dart';
 import 'auth_repository.dart';
@@ -20,6 +21,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
   final _userName = TextEditingController();
+  final _description = TextEditingController();
   var _register = false;
   String? _profileImageUrl;
 
@@ -29,6 +31,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _password.dispose();
     _confirmPassword.dispose();
     _userName.dispose();
+    _description.dispose();
     super.dispose();
   }
 
@@ -39,19 +42,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         error: (error, _) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text(error.toString())));
+          ).showSnackBar(SnackBar(content: Text(userMessage(error))));
         },
       );
     });
 
     final loading = ref.watch(authControllerProvider).isLoading;
+    final colors = context.appColors;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.ink, Color(0xFF101C22)],
+            colors: [colors.ink, colors.surface],
           ),
         ),
         child: Center(
@@ -62,9 +66,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: AppColors.surface2,
+                  color: colors.surface2,
                   borderRadius: BorderRadius.circular(AppRadii.lg),
-                  border: Border.all(color: AppColors.line),
+                  border: Border.all(color: colors.line),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -77,10 +81,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Cifras, setlists e repertorios com leitura pronta para ensaio.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.muted),
+                      style: TextStyle(color: colors.muted),
                     ),
                     if (widget.initialError != null) ...[
                       const SizedBox(height: 16),
@@ -152,6 +156,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           prefixIcon: Icon(Icons.lock_reset_rounded),
                         ),
                       ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _description,
+                        minLines: 3,
+                        maxLines: 5,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Descricao',
+                          hintText:
+                              'Compartilhe um pouco sobre voce, sua trajetoria na musica e seus gostos.',
+                          prefixIcon: Icon(Icons.notes_rounded),
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 20),
                     FilledButton(
@@ -193,22 +210,54 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _submit() async {
     final controller = ref.read(authControllerProvider.notifier);
+    final email = _email.text.trim();
+    final password = _password.text;
+
+    if (email.isEmpty) {
+      _showMessage('Informe seu email.');
+      return;
+    }
+    if (!isValidEmailText(email)) {
+      _showMessage('Informe um email valido.');
+      return;
+    }
+    if (password.isEmpty) {
+      _showMessage('Informe sua senha.');
+      return;
+    }
+
     if (_register) {
-      if (_password.text != _confirmPassword.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('As senhas nao conferem.')),
-        );
+      final userName = _userName.text.trim();
+      if (userName.isEmpty) {
+        _showMessage('Informe seu nome de usuario.');
+        return;
+      }
+      if (password != _confirmPassword.text) {
+        _showMessage('As senhas nao conferem.');
+        return;
+      }
+      if (_description.text.trim().length > 500) {
+        _showMessage('A descricao deve ter no maximo 500 caracteres.');
         return;
       }
       await controller.register(
-        _userName.text.trim(),
-        _email.text.trim(),
-        _password.text,
+        userName,
+        email,
+        password,
         profileImageUrl: _profileImageUrl,
+        description: _description.text.trim().isEmpty
+            ? null
+            : _description.text.trim(),
       );
     } else {
-      await controller.login(_email.text.trim(), _password.text);
+      await controller.login(email, password);
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _pickProfileImage() async {

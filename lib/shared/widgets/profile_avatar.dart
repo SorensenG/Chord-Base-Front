@@ -23,6 +23,7 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final image = profileImageProvider(profileImageUrl);
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: CircleAvatar(
@@ -37,7 +38,7 @@ class ProfileAvatar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: radius * 0.72,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.ink,
+                  color: colors.ink,
                 ),
               )
             : null,

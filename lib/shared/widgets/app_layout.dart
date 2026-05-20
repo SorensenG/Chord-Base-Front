@@ -52,6 +52,7 @@ class PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 640;
@@ -79,18 +80,18 @@ class PageHeader extends StatelessWidget {
                             subtitle!,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.muted),
+                            style: TextStyle(color: colors.muted),
                           ),
                         ],
                       ],
                     ),
                   ),
+                  if (actions.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    Row(mainAxisSize: MainAxisSize.min, children: actions),
+                  ],
                 ],
               ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(spacing: 10, runSpacing: 10, children: actions),
-              ],
             ],
           );
         }
@@ -116,10 +117,7 @@ class PageHeader extends StatelessWidget {
                       ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 5),
-                        Text(
-                          subtitle!,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
+                        Text(subtitle!, style: TextStyle(color: colors.muted)),
                       ],
                     ],
                   ),
@@ -149,6 +147,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -159,7 +158,7 @@ class SectionHeader extends StatelessWidget {
               Text(title, style: Theme.of(context).textTheme.titleLarge),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!, style: const TextStyle(color: AppColors.muted)),
+                Text(subtitle!, style: TextStyle(color: colors.muted)),
               ],
             ],
           ),
@@ -201,11 +200,12 @@ class QuickActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Material(
-      color: AppColors.surface2,
+      color: colors.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: colors.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -241,10 +241,7 @@ class QuickActionButton extends StatelessWidget {
                         description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: colors.muted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -317,11 +314,12 @@ class SongListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasMenu = onEdit != null || onDelete != null;
+    final colors = context.appColors;
     return Material(
-      color: AppColors.surface2,
+      color: colors.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: colors.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -359,10 +357,7 @@ class SongListRow extends StatelessWidget {
                       '${chord.artist} • por ${chord.addBy}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: colors.muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -388,7 +383,7 @@ class SongListRow extends StatelessWidget {
                   ],
                 )
               else
-                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                Icon(Icons.chevron_right_rounded, color: colors.muted),
             ],
           ),
         ),
@@ -465,13 +460,14 @@ class ExpandedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: colors.surface2,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

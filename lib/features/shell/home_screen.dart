@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models.dart';
 import '../../core/recent_activity_store.dart';
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../chords/chords_repository.dart';
@@ -57,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
                 title: 'Ola, ${user.userName}',
                 subtitle:
                     'Gerencie suas cifras e setlists, e continue tocando de onde parou.',
-                leading: const AppLogo(size: 42),
+                leading: compact ? const AppLogo(size: 42) : null,
                 actions: [
                   IconButton(
                     tooltip: 'Pendencias',
@@ -227,7 +228,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               invites.when(
                 loading: () => const SizedBox.shrink(),
-                error: (error, _) => Text(error.toString()),
+                error: (error, _) => Text(userMessage(error)),
                 data: (items) => _PendingPanel(
                   inviteCount: items.length,
                   chordCount: chords.maybeWhen(
@@ -288,7 +289,7 @@ class HomeScreen extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 
@@ -326,13 +327,14 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       width: width,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: colors.surface2,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,10 +347,7 @@ class _Metric extends StatelessWidget {
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
           ),
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
+          Text(label, style: TextStyle(color: colors.muted, fontSize: 12)),
         ],
       ),
     );
@@ -364,7 +363,7 @@ class _RecentFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return setlists.when(
       loading: () => const LinearProgressIndicator(),
-      error: (error, _) => Text(error.toString()),
+      error: (error, _) => Text(userMessage(error)),
       data: (items) => Column(
         children: [
           for (final item in items.take(2))
@@ -396,11 +395,12 @@ class _RecentActivityPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSetlist = activity.type == RecentActivityType.setlist;
+    final colors = context.appColors;
     return Material(
-      color: AppColors.surface2,
+      color: colors.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: colors.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -432,15 +432,12 @@ class _RecentActivityPanel extends StatelessWidget {
                           (isSetlist ? 'Setlist recente' : 'Cifra recente'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: colors.muted, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.play_arrow_rounded, color: AppColors.muted),
+              Icon(Icons.play_arrow_rounded, color: colors.muted),
             ],
           ),
         ),
@@ -457,13 +454,14 @@ class _SetlistHomeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: AppColors.surface2,
+        color: colors.surface2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.lg),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: colors.line),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -485,10 +483,7 @@ class _SetlistHomeRow extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         '${item.chords.length} cifras • ${item.ownerUserName}',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: colors.muted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -517,11 +512,12 @@ class _PendingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final idle = inviteCount == 0 && chordCount == 0;
+    final colors = context.appColors;
     return Material(
-      color: AppColors.surface2,
+      color: colors.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: colors.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -542,13 +538,10 @@ class _PendingPanel extends StatelessWidget {
                   idle
                       ? 'Tudo limpo por aqui. Nenhum convite ou cifra em revisao.'
                       : '$inviteCount convite(s) e $chordCount cifra(s) para revisar.',
-                  style: const TextStyle(color: AppColors.muted),
+                  style: TextStyle(color: colors.muted),
                 ),
               ),
-              const Icon(
-                Icons.keyboard_arrow_up_rounded,
-                color: AppColors.muted,
-              ),
+              Icon(Icons.keyboard_arrow_up_rounded, color: colors.muted),
             ],
           ),
         ),
@@ -588,7 +581,7 @@ class _NotificationsBottomSheet extends ConsumerWidget {
             const SizedBox(height: 18),
             invites.when(
               loading: () => const LinearProgressIndicator(),
-              error: (error, _) => Text(error.toString()),
+              error: (error, _) => Text(userMessage(error)),
               data: (items) => Column(
                 children: [
                   for (final invite in items)
@@ -607,7 +600,7 @@ class _NotificationsBottomSheet extends ConsumerWidget {
             const SizedBox(height: 18),
             chords.when(
               loading: () => const SizedBox.shrink(),
-              error: (error, _) => Text(error.toString()),
+              error: (error, _) => Text(userMessage(error)),
               data: (items) {
                 final reviewItems = items
                     .where((item) => item.status != 'PUBLISHED')
@@ -667,7 +660,7 @@ class _NotificationsBottomSheet extends ConsumerWidget {
         ),
       );
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(SnackBar(content: Text(userMessage(error))));
     }
   }
 }
@@ -722,7 +715,7 @@ class _InviteTile extends ConsumerWidget {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(SnackBar(content: Text(error.toString())));
+                ).showSnackBar(SnackBar(content: Text(userMessage(error))));
               }
             },
             icon: const Icon(Icons.close_rounded),
@@ -746,19 +739,20 @@ class _EmptyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.line),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.muted),
+          Icon(icon, color: colors.muted),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: const TextStyle(color: AppColors.muted)),
+            child: Text(text, style: TextStyle(color: colors.muted)),
           ),
         ],
       ),

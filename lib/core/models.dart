@@ -6,12 +6,14 @@ class UserProfile {
     required this.roles,
     this.active = true,
     this.profileImageUrl,
+    this.description,
   });
 
   final String uuid;
   final String userName;
   final String email;
   final String? profileImageUrl;
+  final String? description;
   final List<String> roles;
   final bool active;
 
@@ -22,6 +24,7 @@ class UserProfile {
     userName: jsonText(json, 'userName'),
     email: jsonText(json, 'email'),
     profileImageUrl: jsonNullableText(json, 'profileImageUrl'),
+    description: jsonNullableText(json, 'description'),
     roles: jsonStringList(json, 'roles'),
     active: jsonBool(json, 'active', fallback: true),
   );
@@ -35,12 +38,14 @@ class AdminUser {
     required this.roles,
     required this.active,
     this.profileImageUrl,
+    this.description,
   });
 
   final String uuid;
   final String userName;
   final String email;
   final String? profileImageUrl;
+  final String? description;
   final List<String> roles;
   final bool active;
 
@@ -51,6 +56,7 @@ class AdminUser {
     userName: jsonText(json, 'userName'),
     email: jsonText(json, 'email'),
     profileImageUrl: jsonNullableText(json, 'profileImageUrl'),
+    description: jsonNullableText(json, 'description'),
     roles: jsonStringList(json, 'roles'),
     active: jsonBool(json, 'active', fallback: true),
   );

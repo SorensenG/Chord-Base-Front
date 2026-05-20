@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models.dart';
 import '../../core/recent_activity_store.dart';
 import '../../core/theme.dart';
+import '../../core/user_messages.dart';
 import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/profile_avatar.dart';
@@ -71,7 +72,7 @@ class SetlistsScreen extends ConsumerWidget {
             const SizedBox(height: 18),
             invites.when(
               loading: () => const SizedBox.shrink(),
-              error: (error, _) => Text(error.toString()),
+              error: (error, _) => Text(userMessage(error)),
               data: (items) => Column(
                 children: [
                   for (final invite in items)
@@ -149,7 +150,7 @@ class SetlistsScreen extends ConsumerWidget {
               error: (error, _) => EmptyState(
                 icon: Icons.error_outline_rounded,
                 title: 'Erro ao carregar',
-                message: error.toString(),
+                message: userMessage(error),
               ),
               data: (items) {
                 if (items.isEmpty) {
@@ -891,7 +892,7 @@ class _SetlistPlayerScreenState extends ConsumerState<SetlistPlayerScreen> {
             body: EmptyState(
               icon: Icons.error_outline_rounded,
               title: 'Nao foi possivel tocar',
-              message: snapshot.error.toString(),
+              message: userMessage(snapshot.error!),
             ),
           );
         }
@@ -1060,7 +1061,7 @@ class _AddChordSheetState extends ConsumerState<_AddChordSheet> {
                   child: EmptyState(
                     icon: Icons.error_outline_rounded,
                     title: 'Nao foi possivel buscar',
-                    message: snapshot.error.toString(),
+                    message: userMessage(snapshot.error!),
                   ),
                 );
               }
