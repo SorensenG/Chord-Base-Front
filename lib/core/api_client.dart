@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'config.dart';
@@ -13,23 +17,48 @@ final tokenStoreProvider = Provider<TokenStore>((ref) {
   return const TokenStore(storage);
 });
 
+final sessionExpiredSignalProvider = StateProvider<int>((ref) => 0);
+
 final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(ref.watch(tokenStoreProvider));
+  return ApiClient(
+    ref.watch(tokenStoreProvider),
+    onSessionExpired: () {
+      ref.read(sessionExpiredSignalProvider.notifier).state++;
+    },
+  );
 });
 
+Duration? appProviderRetry(int retryCount, Object error) {
+  final statusCode = error is ApiException ? error.statusCode : null;
+  if (statusCode != null && statusCode >= 400 && statusCode < 500) {
+    return null;
+  }
+  return ProviderContainer.defaultRetry(retryCount, error);
+}
+
 class ApiClient {
-  ApiClient(this._tokenStore)
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: AppConfig.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
-          headers: const {'Accept': 'application/json'},
-        ),
-      );
+  ApiClient(
+    this._tokenStore, {
+    required VoidCallback onSessionExpired,
+    Dio? dio,
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: AppConfig.apiBaseUrl,
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 30),
+               headers: const {'Accept': 'application/json'},
+             ),
+           ),
+       _onSessionExpired = onSessionExpired;
 
   final TokenStore _tokenStore;
   final Dio _dio;
+  final VoidCallback _onSessionExpired;
+  static const _refreshSkew = Duration(seconds: 45);
+  Future<bool>? _refreshFuture;
+  bool _sessionExpiredNotified = false;
 
   Future<Response<T>> get<T>(
     String path, {
@@ -55,9 +84,24 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     bool retryOnUnauthorized = true,
   }) async {
-    final token = await _tokenStore.readAccessToken();
+    final protectedPath = !_isPublicPath(path);
+    var token = await _tokenStore.readAccessToken();
+    if (retryOnUnauthorized &&
+        protectedPath &&
+        (token == null || token.isEmpty || _shouldRefreshAccessToken(token))) {
+      final refreshed = await _refreshTokenOnce();
+      if (!refreshed) {
+        await _expireSession();
+        throw const ApiException(
+          'Sessao expirada. Entre novamente.',
+          statusCode: 401,
+        );
+      }
+      token = await _tokenStore.readAccessToken();
+    }
+
     try {
-      return await _dio.request<T>(
+      final response = await _dio.request<T>(
         path,
         data: data,
         queryParameters: queryParameters,
@@ -69,21 +113,35 @@ class ApiClient {
           },
         ),
       );
+      _sessionExpiredNotified = false;
+      return response;
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401 && retryOnUnauthorized) {
-        final refreshed = await _refreshToken();
-        if (refreshed) {
-          return _request<T>(
-            method,
-            path,
-            data: data,
-            queryParameters: queryParameters,
-            retryOnUnauthorized: false,
-          );
+      if (error.response?.statusCode == 401 && protectedPath) {
+        if (retryOnUnauthorized) {
+          final refreshed = await _refreshTokenOnce();
+          if (refreshed) {
+            return _request<T>(
+              method,
+              path,
+              data: data,
+              queryParameters: queryParameters,
+              retryOnUnauthorized: false,
+            );
+          }
         }
+        await _expireSession();
       }
       throw ApiException.fromDio(error);
     }
+  }
+
+  Future<bool> _refreshTokenOnce() {
+    final current = _refreshFuture;
+    if (current != null) return current;
+
+    final future = _refreshToken();
+    _refreshFuture = future;
+    return future.whenComplete(() => _refreshFuture = null);
   }
 
   Future<bool> _refreshToken() async {
@@ -100,11 +158,75 @@ class ApiClient {
       final refresh = data?['refreshToken'] as String?;
       if (access == null || refresh == null) return false;
       await _tokenStore.saveTokens(accessToken: access, refreshToken: refresh);
+      _sessionExpiredNotified = false;
       return true;
     } catch (_) {
+      if (await _hasNewerStoredSession(refreshToken)) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (await _hasNewerStoredSession(refreshToken)) {
+        return true;
+      }
       await _tokenStore.clear();
       return false;
     }
+  }
+
+  Future<bool> _hasNewerStoredSession(String refreshToken) async {
+    final latestAccessToken = await _tokenStore.readAccessToken();
+    final latestRefreshToken = await _tokenStore.readRefreshToken();
+    return latestAccessToken != null &&
+        latestAccessToken.isNotEmpty &&
+        latestRefreshToken != null &&
+        latestRefreshToken.isNotEmpty &&
+        latestRefreshToken != refreshToken;
+  }
+
+  Future<void> _expireSession() async {
+    await _tokenStore.clear();
+    if (_sessionExpiredNotified) return;
+    _sessionExpiredNotified = true;
+    _onSessionExpired();
+  }
+
+  bool _isPublicPath(String path) {
+    return path == '/users/login' ||
+        path == '/users/register' ||
+        path == '/users/refresh' ||
+        path == '/users/logout';
+  }
+
+  bool _shouldRefreshAccessToken(String token) {
+    final expiresAt = _jwtExpiration(token);
+    if (expiresAt == null) return false;
+    return !expiresAt.isAfter(DateTime.now().toUtc().add(_refreshSkew));
+  }
+
+  DateTime? _jwtExpiration(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+
+    try {
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
+      final json = jsonDecode(payload);
+      if (json is! Map<String, dynamic>) return null;
+      final exp = json['exp'];
+      if (exp is int) {
+        return DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
+      }
+      if (exp is num) {
+        return DateTime.fromMillisecondsSinceEpoch(
+          exp.toInt() * 1000,
+          isUtc: true,
+        );
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 }
 

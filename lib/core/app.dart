@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'api_client.dart';
 import '../features/auth/auth_repository.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -25,6 +28,10 @@ class AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<int>(sessionExpiredSignalProvider, (previous, next) {
+      if (previous == null || next == previous) return;
+      unawaited(ref.read(authControllerProvider.notifier).expireSession());
+    });
     final auth = ref.watch(authControllerProvider);
     return auth.when(
       loading: () =>

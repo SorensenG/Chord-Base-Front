@@ -51,7 +51,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.ink, Color(0xFF142229)],
+            colors: [AppColors.ink, Color(0xFF101C22)],
           ),
         ),
         child: Center(
@@ -59,126 +59,130 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             constraints: const BoxConstraints(maxWidth: 430),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(child: AppLogo(size: 108)),
-                  const SizedBox(height: 26),
-                  Text(
-                    _register ? 'Crie sua conta' : 'Entre no ChordBase',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Center(child: AppLogo(size: 76)),
+                    const SizedBox(height: 22),
+                    Text(
+                      _register ? 'Crie sua conta' : 'Entre no ChordBase',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Cifras, setlists e repertorios com leitura pronta para ensaio.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted),
-                  ),
-                  if (widget.initialError != null) ...[
-                    const SizedBox(height: 16),
-                    Text(widget.initialError!, textAlign: TextAlign.center),
-                  ],
-                  const SizedBox(height: 28),
-                  if (_register) ...[
-                    Center(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ProfileAvatar(
-                            userName: _userName.text,
-                            profileImageUrl: _profileImageUrl,
-                            radius: 44,
-                            onTap: _pickProfileImage,
-                          ),
-                          Positioned(
-                            right: -4,
-                            bottom: -4,
-                            child: IconButton.filled(
-                              tooltip: 'Escolher foto',
-                              onPressed: _pickProfileImage,
-                              icon: const Icon(Icons.photo_camera_rounded),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Cifras, setlists e repertorios com leitura pronta para ensaio.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                    if (widget.initialError != null) ...[
+                      const SizedBox(height: 16),
+                      Text(widget.initialError!, textAlign: TextAlign.center),
+                    ],
+                    const SizedBox(height: 24),
+                    if (_register) ...[
+                      Center(
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ProfileAvatar(
+                              userName: _userName.text,
+                              profileImageUrl: _profileImageUrl,
+                              radius: 44,
+                              onTap: _pickProfileImage,
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              right: -4,
+                              bottom: -4,
+                              child: IconButton.filled(
+                                tooltip: 'Escolher foto',
+                                onPressed: _pickProfileImage,
+                                icon: const Icon(Icons.photo_camera_rounded),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
+                      const SizedBox(height: 18),
+                      TextField(
+                        controller: _userName,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Nome de usuario',
+                          hintText: 'ex: gabriel.dev',
+                          prefixIcon: Icon(Icons.alternate_email),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     TextField(
-                      controller: _userName,
-                      onChanged: (_) => setState(() {}),
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        labelText: 'Nome de usuario',
-                        hintText: 'ex: gabriel.dev',
-                        prefixIcon: Icon(Icons.alternate_email),
+                        labelText: 'Email',
+                        hintText: 'ex: voce@email.com',
+                        prefixIcon: Icon(Icons.mail_outline),
                       ),
                     ),
                     const SizedBox(height: 14),
-                  ],
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'ex: voce@email.com',
-                      prefixIcon: Icon(Icons.mail_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _password,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Senha',
-                      hintText: 'ex: sua senha',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                  ),
-                  if (_register) ...[
-                    const SizedBox(height: 14),
                     TextField(
-                      controller: _confirmPassword,
+                      controller: _password,
                       obscureText: true,
                       decoration: const InputDecoration(
-                        labelText: 'Confirmar senha',
-                        hintText: 'repita sua senha',
-                        prefixIcon: Icon(Icons.lock_reset_rounded),
+                        labelText: 'Senha',
+                        hintText: 'ex: sua senha',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                    ),
+                    if (_register) ...[
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _confirmPassword,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirmar senha',
+                          hintText: 'repita sua senha',
+                          prefixIcon: Icon(Icons.lock_reset_rounded),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: loading ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      child: Text(_register ? 'Criar e entrar' : 'Entrar'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: loading
+                          ? null
+                          : () => ref
+                                .read(authControllerProvider.notifier)
+                                .google(),
+                      icon: const Icon(Icons.g_mobiledata, size: 28),
+                      label: const Text('Continuar com Google'),
+                    ),
+                    TextButton(
+                      onPressed: loading
+                          ? null
+                          : () => setState(() => _register = !_register),
+                      child: Text(
+                        _register
+                            ? 'Ja tenho conta'
+                            : 'Criar nova conta ChordBase',
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: loading ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      foregroundColor: AppColors.ink,
-                      minimumSize: const Size.fromHeight(54),
-                    ),
-                    child: Text(_register ? 'Criar e entrar' : 'Entrar'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: loading
-                        ? null
-                        : () => ref
-                              .read(authControllerProvider.notifier)
-                              .google(),
-                    icon: const Icon(Icons.g_mobiledata, size: 28),
-                    label: const Text('Continuar com Google'),
-                  ),
-                  TextButton(
-                    onPressed: loading
-                        ? null
-                        : () => setState(() => _register = !_register),
-                    child: Text(
-                      _register
-                          ? 'Ja tenho conta'
-                          : 'Criar nova conta ChordBase',
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

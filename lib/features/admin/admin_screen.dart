@@ -154,11 +154,13 @@ class _UsersList extends ConsumerWidget {
                       ),
                       Switch(
                         value: user.isAdmin,
-                        onChanged: (enabled) => _setAdmin(ref, user, enabled),
+                        onChanged: (enabled) =>
+                            _setAdmin(context, ref, user, enabled),
                       ),
                       Switch(
                         value: user.active,
-                        onChanged: (enabled) => _setActive(ref, user, enabled),
+                        onChanged: (enabled) =>
+                            _setActive(context, ref, user, enabled),
                       ),
                     ],
                   ),
@@ -170,14 +172,38 @@ class _UsersList extends ConsumerWidget {
     );
   }
 
-  Future<void> _setAdmin(WidgetRef ref, AdminUser user, bool enabled) async {
-    await ref.read(adminRepositoryProvider).setAdmin(user, enabled);
-    ref.invalidate(adminUsersProvider);
+  Future<void> _setAdmin(
+    BuildContext context,
+    WidgetRef ref,
+    AdminUser user,
+    bool enabled,
+  ) async {
+    try {
+      await ref.read(adminRepositoryProvider).setAdmin(user, enabled);
+      ref.invalidate(adminUsersProvider);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
-  Future<void> _setActive(WidgetRef ref, AdminUser user, bool enabled) async {
-    await ref.read(adminRepositoryProvider).setActive(user, enabled);
-    ref.invalidate(adminUsersProvider);
+  Future<void> _setActive(
+    BuildContext context,
+    WidgetRef ref,
+    AdminUser user,
+    bool enabled,
+  ) async {
+    try {
+      await ref.read(adminRepositoryProvider).setActive(user, enabled);
+      ref.invalidate(adminUsersProvider);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
   Future<void> _editRoles(
@@ -232,8 +258,15 @@ class _UsersList extends ConsumerWidget {
       ),
     );
     if (roles == null) return;
-    await ref.read(adminRepositoryProvider).setRoles(user, roles);
-    ref.invalidate(adminUsersProvider);
+    try {
+      await ref.read(adminRepositoryProvider).setRoles(user, roles);
+      ref.invalidate(adminUsersProvider);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 }
 
@@ -321,22 +354,31 @@ class _AdminChordList extends ConsumerWidget {
                 label: 'Excluir',
               ),
               confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  final detail = await ref
-                      .read(chordsRepositoryProvider)
-                      .getById(chord.uuid);
+                try {
+                  if (direction == DismissDirection.startToEnd) {
+                    final detail = await ref
+                        .read(chordsRepositoryProvider)
+                        .getById(chord.uuid);
+                    if (context.mounted) {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChordEditScreen(chord: detail),
+                        ),
+                      );
+                      ref.invalidate(adminUserChordsProvider(user.uuid));
+                    }
+                    return false;
+                  }
+                  await ref.read(chordsRepositoryProvider).delete(chord.uuid);
+                  ref.invalidate(adminUserChordsProvider(user.uuid));
+                } catch (error) {
                   if (context.mounted) {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChordEditScreen(chord: detail),
-                      ),
-                    );
-                    ref.invalidate(adminUserChordsProvider(user.uuid));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(error.toString())));
                   }
                   return false;
                 }
-                await ref.read(chordsRepositoryProvider).delete(chord.uuid);
-                ref.invalidate(adminUserChordsProvider(user.uuid));
                 return false;
               },
               child: AppCard(
@@ -397,19 +439,30 @@ class _AdminSetlistList extends ConsumerWidget {
                 label: 'Excluir',
               ),
               confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
+                try {
+                  if (direction == DismissDirection.startToEnd) {
+                    if (context.mounted) {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SetlistDetailScreen(setlist: setlist),
+                        ),
+                      );
+                      ref.invalidate(adminUserSetlistsProvider(user.uuid));
+                    }
+                    return false;
+                  }
+                  await ref
+                      .read(setlistsRepositoryProvider)
+                      .delete(setlist.uuid);
+                  ref.invalidate(adminUserSetlistsProvider(user.uuid));
+                } catch (error) {
                   if (context.mounted) {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SetlistDetailScreen(setlist: setlist),
-                      ),
-                    );
-                    ref.invalidate(adminUserSetlistsProvider(user.uuid));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(error.toString())));
                   }
                   return false;
                 }
-                await ref.read(setlistsRepositoryProvider).delete(setlist.uuid);
-                ref.invalidate(adminUserSetlistsProvider(user.uuid));
                 return false;
               },
               child: AppCard(

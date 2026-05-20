@@ -8,12 +8,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/models.dart';
+import '../../core/recent_activity_store.dart';
 import '../../core/token_store.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     ref.watch(apiClientProvider),
     ref.watch(tokenStoreProvider),
+    ref.watch(recentActivityStoreProvider),
   );
 });
 
@@ -23,10 +25,11 @@ final authControllerProvider =
     });
 
 class AuthRepository {
-  AuthRepository(this._api, this._tokens);
+  AuthRepository(this._api, this._tokens, this._recentActivityStore);
 
   final ApiClient _api;
   final TokenStore _tokens;
+  final RecentActivityStore _recentActivityStore;
 
   Future<AuthSession> login({
     required String email,
@@ -102,14 +105,20 @@ class AuthRepository {
 
   Future<void> logout() async {
     final refresh = await _tokens.readRefreshToken();
+    await _tokens.clear();
+    await _recentActivityStore.clear();
+    await GoogleSignIn.instance.signOut().catchError((_) {});
     try {
       if (refresh != null && refresh.isNotEmpty) {
         await _api.post<void>('/users/logout', data: {'refreshToken': refresh});
       }
-    } finally {
-      await _tokens.clear();
-      await GoogleSignIn.instance.signOut().catchError((_) {});
-    }
+    } catch (_) {}
+  }
+
+  Future<void> clearLocalSession() async {
+    await _tokens.clear();
+    await _recentActivityStore.clear();
+    await GoogleSignIn.instance.signOut().catchError((_) {});
   }
 
   Future<void> signInWithGoogle() async {
@@ -203,7 +212,12 @@ class AuthController extends StateNotifier<AsyncValue<UserProfile?>> {
   }
 
   Future<void> logout() async {
-    await _repository.logout();
+    state = const AsyncValue.data(null);
+    unawaited(_repository.logout());
+  }
+
+  Future<void> expireSession() async {
+    await _repository.clearLocalSession();
     state = const AsyncValue.data(null);
   }
 }

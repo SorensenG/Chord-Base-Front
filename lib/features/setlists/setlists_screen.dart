@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
+import '../../core/recent_activity_store.dart';
 import '../../core/theme.dart';
-import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/profile_avatar.dart';
 import '../auth/auth_repository.dart';
@@ -21,6 +22,22 @@ final invitesProvider = FutureProvider.autoDispose<List<SetlistInvite>>((ref) {
   return ref.watch(setlistsRepositoryProvider).invites();
 });
 
+Future<bool> showSetlistForm(
+  BuildContext context,
+  WidgetRef ref, {
+  Setlist? initial,
+}) async {
+  final changed = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _SetlistForm(initial: initial),
+  );
+  if (changed == true) {
+    ref.invalidate(setlistsProvider);
+  }
+  return changed == true;
+}
+
 class SetlistsScreen extends ConsumerWidget {
   const SetlistsScreen({super.key});
 
@@ -31,24 +48,27 @@ class SetlistsScreen extends ConsumerWidget {
     final currentUserUuid = ref
         .watch(authControllerProvider)
         .whenOrNull(data: (user) => user?.uuid);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Setlists'),
-        actions: [
-          IconButton(
-            onPressed: () => _create(context, ref),
-            icon: const Icon(Icons.add_rounded),
-          ),
-        ],
-      ),
+    return AppScaffold(
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(setlistsProvider);
           ref.invalidate(invitesProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           children: [
+            PageHeader(
+              title: 'Setlists',
+              subtitle: 'Organize repertorios e abra tudo no modo palco.',
+              actions: [
+                FilledButton.icon(
+                  onPressed: () => _create(context, ref),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Nova setlist'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
             invites.when(
               loading: () => const SizedBox.shrink(),
               error: (error, _) => Text(error.toString()),
@@ -57,7 +77,15 @@ class SetlistsScreen extends ConsumerWidget {
                   for (final invite in items)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: AppCard(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.gold.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(AppRadii.lg),
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.28),
+                          ),
+                        ),
                         child: Row(
                           children: [
                             const Icon(
@@ -66,7 +94,24 @@ class SetlistsScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text('Convite para ${invite.setlistName}'),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    invite.setlistName,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  Text(
+                                    'Convite de ${invite.ownerUserName}',
+                                    style: const TextStyle(
+                                      color: AppColors.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             IconButton(
                               onPressed: () async {
@@ -94,6 +139,11 @@ class SetlistsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SectionHeader(
+              title: 'Meus repertorios',
+              subtitle: 'Setlists prontas para ensaio e apresentacao.',
+            ),
+            const SizedBox(height: 12),
             setlists.when(
               loading: () => const LinearProgressIndicator(),
               error: (error, _) => EmptyState(
@@ -113,28 +163,18 @@ class SetlistsScreen extends ConsumerWidget {
                   children: [
                     for (final item in items)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Dismissible(
-                          key: ValueKey('setlist-${item.uuid}'),
-                          background: const _SetlistSwipeBackground(
-                            alignment: Alignment.centerLeft,
-                            color: AppColors.teal,
-                            icon: Icons.edit_rounded,
-                            label: 'Editar',
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SetlistSummaryRow(
+                          setlist: item,
+                          canManage: item.ownerUuid == currentUserUuid,
+                          onOpen: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  SetlistDetailScreen(setlist: item),
+                            ),
                           ),
-                          secondaryBackground: const _SetlistSwipeBackground(
-                            alignment: Alignment.centerRight,
-                            color: AppColors.coral,
-                            icon: Icons.delete_rounded,
-                            label: 'Excluir',
-                          ),
-                          confirmDismiss: (direction) async {
-                            final isOwner = item.ownerUuid == currentUserUuid;
-                            if (!isOwner) return false;
-                            if (direction == DismissDirection.startToEnd) {
-                              await _edit(context, ref, item);
-                              return false;
-                            }
+                          onEdit: () => _edit(context, ref, item),
+                          onDelete: () async {
                             final confirmed = await _confirmDelete(
                               context,
                               item.name,
@@ -145,56 +185,7 @@ class SetlistsScreen extends ConsumerWidget {
                                   .delete(item.uuid);
                               ref.invalidate(setlistsProvider);
                             }
-                            return false;
                           },
-                          child: AppCard(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    SetlistDetailScreen(setlist: item),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 54,
-                                  height: 54,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.teal.withValues(
-                                      alpha: 0.16,
-                                    ),
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  child: const Icon(
-                                    Icons.queue_music_rounded,
-                                    color: AppColors.teal,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.name,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
-                                      ),
-                                      Text(
-                                        '${item.chords.length} cifras • ${item.visibility}',
-                                        style: const TextStyle(
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                   ],
@@ -208,12 +199,7 @@ class SetlistsScreen extends ConsumerWidget {
   }
 
   Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _SetlistForm(),
-    );
-    if (created == true) ref.invalidate(setlistsProvider);
+    await showSetlistForm(context, ref);
   }
 
   Future<void> _edit(
@@ -221,12 +207,7 @@ class SetlistsScreen extends ConsumerWidget {
     WidgetRef ref,
     Setlist setlist,
   ) async {
-    final updated = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _SetlistForm(initial: setlist),
-    );
-    if (updated == true) ref.invalidate(setlistsProvider);
+    await showSetlistForm(context, ref, initial: setlist);
   }
 
   Future<bool> _confirmDelete(BuildContext context, String title) async {
@@ -251,41 +232,93 @@ class SetlistsScreen extends ConsumerWidget {
   }
 }
 
-class _SetlistSwipeBackground extends StatelessWidget {
-  const _SetlistSwipeBackground({
-    required this.alignment,
-    required this.color,
-    required this.icon,
-    required this.label,
+class _SetlistSummaryRow extends StatelessWidget {
+  const _SetlistSummaryRow({
+    required this.setlist,
+    required this.canManage,
+    required this.onOpen,
+    required this.onEdit,
+    required this.onDelete,
   });
 
-  final Alignment alignment;
-  final Color color;
-  final IconData icon;
-  final String label;
+  final Setlist setlist;
+  final bool canManage;
+  final VoidCallback onOpen;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(8),
+    return Material(
+      color: AppColors.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        side: const BorderSide(color: AppColors.line),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.teal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: const Icon(
+                  Icons.queue_music_rounded,
+                  color: AppColors.teal,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      setlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${setlist.chords.length} cifras • ${setlist.ownerUserName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              StatusBadge(label: setlist.visibility),
+              const SizedBox(width: 6),
+              if (canManage)
+                PopupMenuButton<String>(
+                  tooltip: 'Acoes da setlist',
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Editar')),
+                    PopupMenuItem(value: 'delete', child: Text('Excluir')),
+                  ],
+                )
+              else
+                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -406,106 +439,170 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   late Setlist _setlist = widget.setlist;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recordSetlist());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_setlist.name),
-        actions: [
-          IconButton(
-            tooltip: 'Tocar setlist',
-            onPressed: _setlist.chords.isEmpty
-                ? null
-                : () => Navigator.of(context).push(
+    final compact = MediaQuery.sizeOf(context).width < 700;
+    return AppScaffold(
+      appBar: AppBar(title: const Text('Setlist')),
+      floatingActionButton: compact
+          ? FloatingActionButton.extended(
+              onPressed: _addChord,
+              icon: const Icon(Icons.library_add_rounded),
+              label: const Text('Adicionar cifra'),
+            )
+          : null,
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 16 : 24,
+              compact ? 12 : 18,
+              compact ? 16 : 24,
+              12,
+            ),
+            child: PageHeader(
+              title: _setlist.name,
+              subtitle:
+                  '${_setlist.chords.length} cifras • ${_setlist.visibility}',
+              actions: compact
+                  ? [
+                      FilledButton.icon(
+                        onPressed: _setlist.chords.isEmpty
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SetlistPlayerScreen(setlist: _setlist),
+                                ),
+                              ),
+                        icon: const Icon(Icons.play_circle_outline_rounded),
+                        label: const Text('Palco'),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Acoes da setlist',
+                        icon: const Icon(Icons.more_horiz_rounded),
+                        onSelected: (value) {
+                          if (value == 'edit') _editSetlist();
+                          if (value == 'invite') _inviteCollaborator();
+                          if (value == 'collaborators') _manageCollaborators();
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Editar setlist'),
+                          ),
+                          if (_setlist.visibility == 'COLLABORATIVE')
+                            const PopupMenuItem(
+                              value: 'invite',
+                              child: Text('Convidar colaborador'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'collaborators',
+                            child: Text('Colaboradores'),
+                          ),
+                        ],
+                      ),
+                    ]
+                  : [
+                      FilledButton.icon(
+                        onPressed: _setlist.chords.isEmpty
+                            ? null
+                            : () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SetlistPlayerScreen(setlist: _setlist),
+                                ),
+                              ),
+                        icon: const Icon(Icons.play_circle_outline_rounded),
+                        label: const Text('Modo palco'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _addChord,
+                        icon: const Icon(Icons.library_add_rounded),
+                        label: const Text('Adicionar'),
+                      ),
+                      IconButton(
+                        tooltip: 'Editar setlist',
+                        onPressed: _editSetlist,
+                        icon: const Icon(Icons.edit_rounded),
+                      ),
+                      if (_setlist.visibility == 'COLLABORATIVE')
+                        IconButton(
+                          tooltip: 'Convidar colaborador',
+                          onPressed: _inviteCollaborator,
+                          icon: const Icon(Icons.group_add_rounded),
+                        ),
+                      IconButton(
+                        tooltip: 'Colaboradores',
+                        onPressed: _manageCollaborators,
+                        icon: const Icon(Icons.people_alt_rounded),
+                      ),
+                    ],
+            ),
+          ),
+          Expanded(
+            child: ReorderableListView.builder(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 16 : 24,
+                8,
+                compact ? 16 : 24,
+                compact ? 104 : 24,
+              ),
+              itemCount: _setlist.chords.length,
+              onReorder: (oldIndex, newIndex) async {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final chords = [..._setlist.chords];
+                final moved = chords.removeAt(oldIndex);
+                chords.insert(newIndex, moved);
+                final updated = await ref
+                    .read(setlistsRepositoryProvider)
+                    .reorder(_setlist.uuid, chords);
+                setState(() => _setlist = updated);
+              },
+              itemBuilder: (_, index) {
+                final chord = _setlist.chords[index];
+                return _SetlistChordRow(
+                  key: ValueKey(chord.uuid),
+                  chord: chord,
+                  index: index,
+                  onOpen: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => SetlistPlayerScreen(setlist: _setlist),
+                      builder: (_) => ChordPlayerLoader(uuid: chord.uuid),
                     ),
                   ),
-            icon: const Icon(Icons.play_circle_outline_rounded),
-          ),
-          IconButton(
-            tooltip: 'Editar setlist',
-            onPressed: _editSetlist,
-            icon: const Icon(Icons.edit_rounded),
-          ),
-          if (_setlist.visibility == 'COLLABORATIVE')
-            IconButton(
-              tooltip: 'Convidar colaborador',
-              onPressed: _inviteCollaborator,
-              icon: const Icon(Icons.group_add_rounded),
+                  onDelete: () async {
+                    final updated = await ref
+                        .read(setlistsRepositoryProvider)
+                        .removeChord(_setlist.uuid, chord.uuid);
+                    setState(() => _setlist = updated);
+                  },
+                );
+              },
             ),
-          IconButton(
-            tooltip: 'Colaboradores',
-            onPressed: _manageCollaborators,
-            icon: const Icon(Icons.people_alt_rounded),
-          ),
-          IconButton(
-            onPressed: _addChord,
-            icon: const Icon(Icons.library_add_rounded),
           ),
         ],
       ),
-      body: ReorderableListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: _setlist.chords.length,
-        onReorder: (oldIndex, newIndex) async {
-          if (newIndex > oldIndex) newIndex -= 1;
-          final chords = [..._setlist.chords];
-          final moved = chords.removeAt(oldIndex);
-          chords.insert(newIndex, moved);
-          final updated = await ref
-              .read(setlistsRepositoryProvider)
-              .reorder(_setlist.uuid, chords);
-          setState(() => _setlist = updated);
-        },
-        itemBuilder: (_, index) {
-          final chord = _setlist.chords[index];
-          return Padding(
-            key: ValueKey(chord.uuid),
-            padding: const EdgeInsets.only(bottom: 12),
-            child: AppCard(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChordPlayerLoader(uuid: chord.uuid),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    '${index + 1}',
-                    style: const TextStyle(color: AppColors.muted),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          chord.chordName,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          chord.artist,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () async {
-                      final updated = await ref
-                          .read(setlistsRepositoryProvider)
-                          .removeChord(_setlist.uuid, chord.uuid);
-                      setState(() => _setlist = updated);
-                    },
-                    icon: const Icon(Icons.delete_outline_rounded),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
     );
+  }
+
+  Future<void> _recordSetlist() async {
+    if (!mounted) return;
+    await ref
+        .read(recentActivityStoreProvider)
+        .save(
+          RecentActivity(
+            type: RecentActivityType.setlist,
+            uuid: _setlist.uuid,
+            title: _setlist.name,
+            subtitle: '${_setlist.chords.length} cifras',
+          ),
+        );
+    ref.invalidate(recentActivityProvider);
   }
 
   Future<void> _editSetlist() async {
@@ -521,6 +618,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       if (!mounted) return;
       setState(() => _setlist = fresh);
       ref.invalidate(setlistsProvider);
+      await _recordSetlist();
     }
   }
 
@@ -651,6 +749,88 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   }
 }
 
+class _SetlistChordRow extends StatelessWidget {
+  const _SetlistChordRow({
+    super.key,
+    required this.chord,
+    required this.index,
+    required this.onOpen,
+    required this.onDelete,
+  });
+
+  final SetlistChord chord;
+  final int index;
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppColors.surface2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          side: const BorderSide(color: AppColors.line),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '${index + 1}'.padLeft(2, '0'),
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chord.chordName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        chord.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remover da setlist',
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+                const Icon(
+                  Icons.drag_indicator_rounded,
+                  color: AppColors.muted,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SetlistPlayerScreen extends ConsumerStatefulWidget {
   const SetlistPlayerScreen({super.key, required this.setlist});
 
@@ -663,6 +843,24 @@ class SetlistPlayerScreen extends ConsumerStatefulWidget {
 
 class _SetlistPlayerScreenState extends ConsumerState<SetlistPlayerScreen> {
   var _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref
+          .read(recentActivityStoreProvider)
+          .save(
+            RecentActivity(
+              type: RecentActivityType.setlist,
+              uuid: widget.setlist.uuid,
+              title: widget.setlist.name,
+              subtitle: '${widget.setlist.chords.length} cifras',
+            ),
+          );
+      ref.invalidate(recentActivityProvider);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

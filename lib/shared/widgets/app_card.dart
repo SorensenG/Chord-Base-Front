@@ -12,17 +12,17 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Container(
-      padding: padding ?? const EdgeInsets.all(18),
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
         border: Border.all(color: AppColors.line),
       ),
       child: child,
     );
     if (onTap == null) return content;
     return InkWell(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(AppRadii.lg),
       onTap: onTap,
       child: content,
     );

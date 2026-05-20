@@ -1,17 +1,100 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/models.dart';
+import '../../core/api_client.dart';
+import '../../core/recent_activity_store.dart';
 import '../../core/theme.dart';
-import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/app_layout.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../auth/auth_repository.dart';
 import 'chordpro_parser.dart';
 import 'chords_repository.dart';
+
+final chordLibraryFilterProvider = StateProvider<ChordLibraryFilter>((ref) {
+  return ChordLibraryFilter.all;
+});
+
+enum ChordLibraryFilter {
+  all('Todas'),
+  published('Publicadas'),
+  review('Revisar');
+
+  const ChordLibraryFilter(this.label);
+
+  final String label;
+}
+
+Future<String?> runChordImportFlow(
+  BuildContext context,
+  WidgetRef ref, {
+  String? refreshSearchQuery,
+}) async {
+  final file = await FilePicker.platform.pickFiles(
+    withData: true,
+    type: FileType.custom,
+    allowedExtensions: ['pdf', 'txt', 'png', 'jpg', 'jpeg'],
+  );
+  if (file == null || file.files.isEmpty || !context.mounted) return null;
+
+  var dialogOpen = true;
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+
+  try {
+    final preview = await ref
+        .read(chordsRepositoryProvider)
+        .preview(file.files.single);
+    if (!context.mounted) return null;
+    if (dialogOpen) {
+      Navigator.of(context, rootNavigator: true).pop();
+      dialogOpen = false;
+    }
+
+    final uuid = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => ChordReviewScreen(preview: preview)),
+    );
+    if (uuid == null || !context.mounted) return uuid;
+
+    ref.invalidate(myChordsProvider);
+    final query = refreshSearchQuery?.trim();
+    if (query != null && query.isNotEmpty) {
+      ref.invalidate(chordSearchProvider(query));
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Cifra adicionada.'),
+        action: SnackBarAction(
+          label: 'Abrir',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ChordPlayerLoader(uuid: uuid)),
+            );
+          },
+        ),
+      ),
+    );
+    return uuid;
+  } catch (error) {
+    if (!context.mounted) return null;
+    if (dialogOpen) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error.toString())));
+    return null;
+  }
+}
 
 class ChordsScreen extends ConsumerStatefulWidget {
   const ChordsScreen({super.key});
@@ -33,25 +116,28 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
   @override
   Widget build(BuildContext context) {
     final normalizedQuery = _query.trim();
+    final filter = ref.watch(chordLibraryFilterProvider);
     final myChords = ref.watch(myChordsProvider);
     final result = ref.watch(chordSearchProvider(normalizedQuery));
     final isAdmin =
         ref.watch(authControllerProvider).whenOrNull(data: (u) => u?.isAdmin) ??
         false;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cifras'),
-        actions: [
-          IconButton(
-            tooltip: 'Enviar cifra',
-            onPressed: _upload,
-            icon: const Icon(Icons.upload_file_rounded),
-          ),
-        ],
-      ),
+    return AppScaffold(
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         children: [
+          PageHeader(
+            title: 'Cifras',
+            subtitle: 'Importe, revise e encontre musicas para tocar.',
+            actions: [
+              FilledButton.icon(
+                onPressed: _upload,
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('Importar'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
           TextField(
             controller: _search,
             textInputAction: TextInputAction.search,
@@ -66,39 +152,18 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          AppCard(
-            onTap: _upload,
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: AppColors.coral.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(Icons.add_rounded, color: AppColors.coral),
+          const SizedBox(height: 14),
+          ActionToolbar(
+            children: [
+              for (final filter in ChordLibraryFilter.values)
+                ChoiceChip(
+                  label: Text(filter.label),
+                  selected: ref.watch(chordLibraryFilterProvider) == filter,
+                  onSelected: (_) =>
+                      ref.read(chordLibraryFilterProvider.notifier).state =
+                          filter,
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Adicionar nova cifra',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'PDF, imagem ou TXT para extrair ChordPro.',
-                        style: TextStyle(color: AppColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
           const SizedBox(height: 22),
           if (normalizedQuery.isEmpty)
@@ -110,17 +175,19 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                 message: error.toString(),
               ),
               data: (items) {
-                if (items.isEmpty) {
+                final filtered = _applyFilter(items, filter);
+                if (filtered.isEmpty) {
                   return const EmptyState(
                     icon: Icons.music_note_rounded,
-                    title: 'Nenhuma cifra criada ainda',
+                    title: 'Nenhuma cifra nesse filtro',
                     message:
-                        'Envie uma cifra para ela aparecer aqui e poder entrar em setlists.',
+                        'Importe uma cifra ou altere os filtros para continuar.',
                   );
                 }
                 return _ChordSummaryList(
-                  title: 'Minhas cifras',
-                  items: items,
+                  title: 'Minha biblioteca',
+                  subtitle: '${filtered.length} cifra(s) encontradas',
+                  items: filtered,
                   onOpen: _openChord,
                   onEdit: _editChord,
                   onDelete: _deleteChord,
@@ -137,7 +204,8 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                 message: error.toString(),
               ),
               data: (items) {
-                if (items.isEmpty) {
+                final filtered = _applyFilter(items, filter);
+                if (filtered.isEmpty) {
                   return const EmptyState(
                     icon: Icons.search_off_rounded,
                     title: 'Nada encontrado',
@@ -146,7 +214,8 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                 }
                 return _ChordSummaryList(
                   title: 'Resultado da busca',
-                  items: items,
+                  subtitle: '${filtered.length} resultado(s)',
+                  items: filtered,
                   onOpen: _openChord,
                   onEdit: isAdmin ? _editChord : null,
                   onDelete: isAdmin ? _deleteChord : null,
@@ -159,38 +228,21 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
     );
   }
 
+  List<ChordSummary> _applyFilter(
+    List<ChordSummary> items,
+    ChordLibraryFilter filter,
+  ) {
+    return switch (filter) {
+      ChordLibraryFilter.all => items,
+      ChordLibraryFilter.published =>
+        items.where((item) => item.status == 'PUBLISHED').toList(),
+      ChordLibraryFilter.review =>
+        items.where((item) => item.status != 'PUBLISHED').toList(),
+    };
+  }
+
   Future<void> _upload() async {
-    final file = await FilePicker.platform.pickFiles(
-      withData: true,
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'txt', 'png', 'jpg', 'jpeg'],
-    );
-    if (file == null || file.files.isEmpty || !mounted) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-    try {
-      final preview = await ref
-          .read(chordsRepositoryProvider)
-          .preview(file.files.single);
-      if (!mounted) return;
-      Navigator.pop(context);
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChordReviewScreen(preview: preview)),
-      );
-      ref.invalidate(myChordsProvider);
-      if (_query.trim().isNotEmpty) {
-        ref.invalidate(chordSearchProvider(_query.trim()));
-      }
-    } catch (error) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
-    }
+    await runChordImportFlow(context, ref, refreshSearchQuery: _query);
   }
 
   Future<void> _openChord(String uuid) async {
@@ -239,6 +291,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
 class _ChordSummaryList extends StatelessWidget {
   const _ChordSummaryList({
     required this.title,
+    required this.subtitle,
     required this.items,
     required this.onOpen,
     required this.isAdmin,
@@ -247,6 +300,7 @@ class _ChordSummaryList extends StatelessWidget {
   });
 
   final String title;
+  final String subtitle;
   final List<ChordSummary> items;
   final ValueChanged<String> onOpen;
   final bool isAdmin;
@@ -258,73 +312,26 @@ class _ChordSummaryList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader(title: title, subtitle: subtitle),
         const SizedBox(height: 12),
         for (final chord in items)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Dismissible(
-              key: ValueKey('chord-${chord.uuid}-${chord.status}'),
-              background: _SwipeBackground(
-                alignment: Alignment.centerLeft,
-                color: AppColors.teal,
-                icon: Icons.edit_rounded,
-                label: 'Editar',
-              ),
-              secondaryBackground: _SwipeBackground(
-                alignment: Alignment.centerRight,
-                color: AppColors.coral,
-                icon: Icons.delete_rounded,
-                label: 'Excluir',
-              ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  final canEdit = !chord.isPublished || isAdmin;
-                  if (canEdit) onEdit?.call(chord);
-                  return false;
-                }
-                final canDelete = !chord.isPublished || isAdmin;
-                if (!canDelete || onDelete == null) return false;
-                final confirmed = await _confirmDelete(
-                  context,
-                  chord.chordName,
-                );
-                if (confirmed) onDelete!(chord);
-                return false;
-              },
-              child: AppCard(
-                onTap: () => onOpen(chord.uuid),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.library_music_rounded,
-                      color: AppColors.teal,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chord.chordName,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            '${chord.artist} - por ${chord.addBy}',
-                            style: const TextStyle(color: AppColors.muted),
-                          ),
-                          const SizedBox(height: 6),
-                          Chip(
-                            visualDensity: VisualDensity.compact,
-                            label: Text(chord.status),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded),
-                  ],
-                ),
-              ),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SongListRow(
+              chord: chord,
+              onOpen: () => onOpen(chord.uuid),
+              onEdit: (!chord.isPublished || isAdmin) && onEdit != null
+                  ? () => onEdit!(chord)
+                  : null,
+              onDelete: (!chord.isPublished || isAdmin) && onDelete != null
+                  ? () async {
+                      final confirmed = await _confirmDelete(
+                        context,
+                        chord.chordName,
+                      );
+                      if (confirmed) onDelete!(chord);
+                    }
+                  : null,
             ),
           ),
       ],
@@ -373,10 +380,16 @@ class _ChordEditScreenState extends ConsumerState<ChordEditScreen> {
     _name = TextEditingController(text: widget.chord.chordName);
     _artist = TextEditingController(text: widget.chord.artist);
     _chordPro = TextEditingController(text: widget.chord.chordPro);
+    _name.addListener(_refreshPreview);
+    _artist.addListener(_refreshPreview);
+    _chordPro.addListener(_refreshPreview);
   }
 
   @override
   void dispose() {
+    _name.removeListener(_refreshPreview);
+    _artist.removeListener(_refreshPreview);
+    _chordPro.removeListener(_refreshPreview);
     _name.dispose();
     _artist.dispose();
     _chordPro.dispose();
@@ -385,10 +398,10 @@ class _ChordEditScreenState extends ConsumerState<ChordEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Editar cifra')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+    return ImportReviewLayout(
+      title: 'Editar cifra',
+      subtitle: 'Ajuste metadados e confira o resultado renderizado.',
+      details: Column(
         children: [
           TextField(
             controller: _name,
@@ -399,43 +412,51 @@ class _ChordEditScreenState extends ConsumerState<ChordEditScreen> {
             controller: _artist,
             decoration: const InputDecoration(labelText: 'Artista'),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _chordPro,
-            minLines: 14,
-            maxLines: 24,
-            style: const TextStyle(fontFamily: 'Roboto Mono'),
-            decoration: const InputDecoration(labelText: 'ChordPro'),
-          ),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save_rounded),
-            label: const Text('Salvar'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChordPlayerScreen(
-                    chord: ChordDetail(
-                      uuid: widget.chord.uuid,
-                      chordName: _name.text,
-                      artist: _artist.text,
-                      chordPro: _chordPro.text,
-                      addBy: widget.chord.addBy,
-                    ),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Ver modo reproducao'),
-          ),
         ],
       ),
+      editor: TextField(
+        controller: _chordPro,
+        minLines: 18,
+        maxLines: 28,
+        style: const TextStyle(fontFamily: 'Roboto Mono'),
+        decoration: const InputDecoration(labelText: 'ChordPro'),
+      ),
+      preview: _ChordPreviewPane(
+        chordName: _name.text,
+        artist: _artist.text,
+        chordPro: _chordPro.text,
+      ),
+      actions: [
+        FilledButton.icon(
+          onPressed: _save,
+          icon: const Icon(Icons.save_rounded),
+          label: const Text('Salvar'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ChordPlayerScreen(
+                  chord: ChordDetail(
+                    uuid: widget.chord.uuid,
+                    chordName: _name.text,
+                    artist: _artist.text,
+                    chordPro: _chordPro.text,
+                    addBy: widget.chord.addBy,
+                  ),
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Ver modo reproducao'),
+        ),
+      ],
     );
+  }
+
+  void _refreshPreview() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _save() async {
@@ -459,46 +480,6 @@ class _ChordEditScreenState extends ConsumerState<ChordEditScreen> {
   }
 }
 
-class _SwipeBackground extends StatelessWidget {
-  const _SwipeBackground({
-    required this.alignment,
-    required this.color,
-    required this.icon,
-    required this.label,
-  });
-
-  final Alignment alignment;
-  final Color color;
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class ChordReviewScreen extends ConsumerStatefulWidget {
   const ChordReviewScreen({super.key, required this.preview});
 
@@ -519,10 +500,16 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
     _name = TextEditingController(text: widget.preview.chordName);
     _artist = TextEditingController(text: widget.preview.artist);
     _chordPro = TextEditingController(text: widget.preview.chordPro);
+    _name.addListener(_refreshPreview);
+    _artist.addListener(_refreshPreview);
+    _chordPro.addListener(_refreshPreview);
   }
 
   @override
   void dispose() {
+    _name.removeListener(_refreshPreview);
+    _artist.removeListener(_refreshPreview);
+    _chordPro.removeListener(_refreshPreview);
     _name.dispose();
     _artist.dispose();
     _chordPro.dispose();
@@ -531,11 +518,24 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Revisar cifra')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+    return ImportReviewLayout(
+      title: 'Revisar cifra',
+      subtitle: 'Confira o ChordPro extraido antes de publicar.',
+      details: Column(
         children: [
+          Row(
+            children: [
+              StatusBadge(label: widget.preview.status),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Revise acordes, secoes e tablaturas antes de salvar.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: _name,
             decoration: const InputDecoration(labelText: 'Musica'),
@@ -545,43 +545,51 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
             controller: _artist,
             decoration: const InputDecoration(labelText: 'Artista'),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _chordPro,
-            minLines: 14,
-            maxLines: 24,
-            style: const TextStyle(fontFamily: 'monospace'),
-            decoration: const InputDecoration(labelText: 'ChordPro'),
-          ),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: _confirm,
-            icon: const Icon(Icons.check_rounded),
-            label: const Text('Publicar cifra'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChordPlayerScreen(
-                    chord: ChordDetail(
-                      uuid: widget.preview.uuid,
-                      chordName: _name.text,
-                      artist: _artist.text,
-                      chordPro: _chordPro.text,
-                      addBy: '',
-                    ),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Ver modo reproducao'),
-          ),
         ],
       ),
+      editor: TextField(
+        controller: _chordPro,
+        minLines: 18,
+        maxLines: 28,
+        style: const TextStyle(fontFamily: 'Roboto Mono'),
+        decoration: const InputDecoration(labelText: 'ChordPro'),
+      ),
+      preview: _ChordPreviewPane(
+        chordName: _name.text,
+        artist: _artist.text,
+        chordPro: _chordPro.text,
+      ),
+      actions: [
+        FilledButton.icon(
+          onPressed: _confirm,
+          icon: const Icon(Icons.check_rounded),
+          label: const Text('Publicar cifra'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ChordPlayerScreen(
+                  chord: ChordDetail(
+                    uuid: widget.preview.uuid,
+                    chordName: _name.text,
+                    artist: _artist.text,
+                    chordPro: _chordPro.text,
+                    addBy: '',
+                  ),
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Ver modo reproducao'),
+        ),
+      ],
     );
+  }
+
+  void _refreshPreview() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _confirm() async {
@@ -597,9 +605,7 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
       if (!mounted) return;
       ref.invalidate(myChordsProvider);
       ref.invalidate(chordSearchProvider(_name.text.trim()));
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => ChordPlayerLoader(uuid: uuid)),
-      );
+      Navigator.of(context).pop(uuid);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -609,27 +615,123 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
   }
 }
 
-class ChordPlayerLoader extends ConsumerWidget {
+class _ChordPreviewPane extends StatelessWidget {
+  const _ChordPreviewPane({
+    required this.chordName,
+    required this.artist,
+    required this.chordPro,
+  });
+
+  final String chordName;
+  final String artist;
+  final String chordPro;
+
+  @override
+  Widget build(BuildContext context) {
+    final document = ChordProDocument.parse(chordPro);
+    final playerItems = _PlayerItem.fromLines(document.lines);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          chordName.isEmpty ? 'Sem titulo' : chordName,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          artist.isEmpty ? 'Artista nao informado' : artist,
+          style: const TextStyle(color: AppColors.muted),
+        ),
+        const Divider(height: 24),
+        for (final item in playerItems.take(80))
+          if (item.tabBlock != null)
+            TabBlockView(
+              lines: item.tabBlock!,
+              fontSize: 13,
+              performance: false,
+            )
+          else if (item.cueLine != null && item.lyricLine != null)
+            CueLyricLineView(
+              cueLine: item.cueLine!,
+              lyricLine: item.lyricLine!,
+              fontSize: 13,
+              performance: false,
+            )
+          else
+            ChordLineView(line: item.line!, fontSize: 13, performance: false),
+        if (playerItems.length > 80)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Preview reduzido. Abra o modo reproducao para ver tudo.',
+              style: TextStyle(color: AppColors.muted, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class ChordPlayerLoader extends ConsumerStatefulWidget {
   const ChordPlayerLoader({super.key, required this.uuid});
 
   final String uuid;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(_chordDetailProvider(uuid));
+  ConsumerState<ChordPlayerLoader> createState() => _ChordPlayerLoaderState();
+}
+
+class _ChordPlayerLoaderState extends ConsumerState<ChordPlayerLoader> {
+  String? _recordedUuid;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = ref.watch(_chordDetailProvider(widget.uuid));
     return detail.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
         body: EmptyState(
-          icon: Icons.error_outline_rounded,
-          title: 'Nao foi possivel abrir',
-          message: error.toString(),
+          icon: _isUnauthorized(error)
+              ? Icons.lock_outline_rounded
+              : Icons.error_outline_rounded,
+          title: _isUnauthorized(error)
+              ? 'Sessao expirada'
+              : 'Nao foi possivel abrir',
+          message: _isUnauthorized(error)
+              ? 'Entre novamente para abrir esta cifra.'
+              : error.toString(),
         ),
       ),
-      data: (chord) => ChordPlayerScreen(chord: chord),
+      data: (chord) {
+        _recordRecentChord(chord);
+        return ChordPlayerScreen(chord: chord);
+      },
     );
+  }
+
+  bool _isUnauthorized(Object error) {
+    return error is ApiException && error.statusCode == 401;
+  }
+
+  void _recordRecentChord(ChordDetail chord) {
+    if (_recordedUuid == chord.uuid) return;
+    _recordedUuid = chord.uuid;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await ref
+          .read(recentActivityStoreProvider)
+          .save(
+            RecentActivity(
+              type: RecentActivityType.chord,
+              uuid: chord.uuid,
+              title: chord.chordName,
+              subtitle: chord.artist,
+            ),
+          );
+      ref.invalidate(recentActivityProvider);
+    });
   }
 }
 
@@ -648,18 +750,27 @@ class ChordPlayerScreen extends StatefulWidget {
   State<ChordPlayerScreen> createState() => _ChordPlayerScreenState();
 }
 
-class _ChordPlayerScreenState extends State<ChordPlayerScreen> {
+class _ChordPlayerScreenState extends State<ChordPlayerScreen>
+    with SingleTickerProviderStateMixin {
   final _scroll = ScrollController();
-  Timer? _timer;
+  late final Ticker _autoScrollTicker;
+  Duration? _lastAutoScrollTick;
   var _transpose = 0;
   var _fontSize = 18.0;
   var _performance = false;
   var _autoScroll = false;
-  var _autoScrollSpeed = 1.4;
+  var _autoScrollSpeed = 0.4;
+  var _showChords = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoScrollTicker = createTicker(_handleAutoScrollTick);
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _autoScrollTicker.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -698,12 +809,13 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen> {
             ),
       body: Column(
         children: [
-          _PlayerControls(
+          PlayerToolbar(
             transpose: _transpose,
             fontSize: _fontSize,
             autoScroll: _autoScroll,
             autoScrollSpeed: _autoScrollSpeed,
             performance: _performance,
+            showChords: _showChords,
             onTranspose: (value) => setState(() => _transpose += value),
             onFont: (value) =>
                 setState(() => _fontSize = (_fontSize + value).clamp(14, 30)),
@@ -711,12 +823,16 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen> {
             onAutoScrollSpeed: (value) =>
                 setState(() => _autoScrollSpeed = value),
             onExitPerformance: () => setState(() => _performance = false),
+            onToggleChords: () => setState(() => _showChords = !_showChords),
           ),
-          if (document.chords.isNotEmpty)
+          if (_showChords && document.chords.isNotEmpty)
             SizedBox(
-              height: 42,
+              height: 48,
               child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 5,
+                ),
                 scrollDirection: Axis.horizontal,
                 itemBuilder: (_, index) =>
                     Chip(label: Text(document.chords[index])),
@@ -725,33 +841,46 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen> {
               ),
             ),
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 60),
-              itemCount: playerItems.length,
-              itemBuilder: (_, index) {
-                final item = playerItems[index];
-                if (item.tabBlock != null) {
-                  return TabBlockView(
-                    lines: item.tabBlock!,
-                    fontSize: _fontSize,
-                    performance: _performance,
-                  );
-                }
-                if (item.cueLine != null && item.lyricLine != null) {
-                  return CueLyricLineView(
-                    cueLine: item.cueLine!,
-                    lyricLine: item.lyricLine!,
-                    fontSize: _fontSize,
-                    performance: _performance,
-                  );
-                }
-                return ChordLineView(
-                  line: item.line!,
-                  fontSize: _fontSize,
-                  performance: _performance,
-                );
-              },
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: _performance ? double.infinity : 1040,
+                ),
+                child: ListView.builder(
+                  controller: _scroll,
+                  padding: EdgeInsets.fromLTRB(
+                    _performance ? 28 : 22,
+                    18,
+                    _performance ? 28 : 22,
+                    70,
+                  ),
+                  itemCount: playerItems.length,
+                  itemBuilder: (_, index) {
+                    final item = playerItems[index];
+                    if (item.tabBlock != null) {
+                      return TabBlockView(
+                        lines: item.tabBlock!,
+                        fontSize: _fontSize,
+                        performance: _performance,
+                      );
+                    }
+                    if (item.cueLine != null && item.lyricLine != null) {
+                      return CueLyricLineView(
+                        cueLine: item.cueLine!,
+                        lyricLine: item.lyricLine!,
+                        fontSize: _fontSize,
+                        performance: _performance,
+                      );
+                    }
+                    return ChordLineView(
+                      line: item.line!,
+                      fontSize: _fontSize,
+                      performance: _performance,
+                    );
+                  },
+                ),
+              ),
             ),
           ),
           if (widget.bottomBar != null) widget.bottomBar!,
@@ -762,31 +891,55 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen> {
 
   void _toggleAutoScroll() {
     setState(() => _autoScroll = !_autoScroll);
-    _timer?.cancel();
-    if (!_autoScroll) return;
-    _timer = Timer.periodic(const Duration(milliseconds: 180), (_) {
-      if (!_scroll.hasClients) return;
-      final next = (_scroll.offset + _autoScrollSpeed).clamp(
-        0,
-        _scroll.position.maxScrollExtent,
-      );
-      _scroll.jumpTo(next.toDouble());
-    });
+    _lastAutoScrollTick = null;
+    if (_autoScroll) {
+      _autoScrollTicker.start();
+    } else {
+      _autoScrollTicker.stop();
+    }
   }
+
+  void _handleAutoScrollTick(Duration elapsed) {
+    if (!_autoScroll || !_scroll.hasClients) return;
+    final previous = _lastAutoScrollTick;
+    _lastAutoScrollTick = elapsed;
+    if (previous == null) return;
+
+    final seconds = (elapsed - previous).inMicroseconds / 1000000;
+    if (seconds <= 0) return;
+
+    final pixelsPerSecond =
+        _autoScrollSpeed.clamp(0.1, 1.0).toDouble() * _lineExtent;
+    final maxExtent = _scroll.position.maxScrollExtent;
+    final next = (_scroll.offset + pixelsPerSecond * seconds).clamp(
+      0.0,
+      maxExtent,
+    );
+    _scroll.jumpTo(next.toDouble());
+    if (next >= maxExtent) {
+      _autoScrollTicker.stop();
+      if (mounted) setState(() => _autoScroll = false);
+    }
+  }
+
+  double get _lineExtent => _fontSize * 1.35 + 10;
 }
 
-class _PlayerControls extends StatelessWidget {
-  const _PlayerControls({
+class PlayerToolbar extends StatelessWidget {
+  const PlayerToolbar({
+    super.key,
     required this.transpose,
     required this.fontSize,
     required this.autoScroll,
     required this.autoScrollSpeed,
     required this.performance,
+    required this.showChords,
     required this.onTranspose,
     required this.onFont,
     required this.onAutoScroll,
     required this.onAutoScrollSpeed,
     required this.onExitPerformance,
+    required this.onToggleChords,
   });
 
   final int transpose;
@@ -794,81 +947,342 @@ class _PlayerControls extends StatelessWidget {
   final bool autoScroll;
   final double autoScrollSpeed;
   final bool performance;
+  final bool showChords;
   final ValueChanged<int> onTranspose;
   final ValueChanged<double> onFont;
   final VoidCallback onAutoScroll;
   final ValueChanged<double> onAutoScrollSpeed;
   final VoidCallback onExitPerformance;
+  final VoidCallback onToggleChords;
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 700;
+    if (compact) return _buildCompact(context);
+    return _buildWide(context);
+  }
+
+  Widget _buildWide(BuildContext context) {
     return SafeArea(
       bottom: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        color: performance ? Colors.black : AppColors.surface,
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => onTranspose(-1),
-              icon: const Icon(Icons.remove_rounded),
-            ),
-            Text(
-              'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            IconButton(
-              onPressed: () => onTranspose(1),
-              icon: const Icon(Icons.add_rounded),
-            ),
-            const Spacer(),
-            IconButton(
-              onPressed: () => onFont(-1),
-              icon: const Icon(Icons.text_decrease_rounded),
-            ),
-            IconButton(
-              onPressed: () => onFont(1),
-              icon: const Icon(Icons.text_increase_rounded),
-            ),
-            IconButton(
-              onPressed: onAutoScroll,
-              color: autoScroll ? AppColors.teal : null,
-              icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
-            ),
-            PopupMenuButton<double>(
-              tooltip: 'Velocidade do autoplay',
-              initialValue: autoScrollSpeed,
-              onSelected: onAutoScrollSpeed,
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 0.8, child: Text('0.5x')),
-                PopupMenuItem(value: 1.4, child: Text('1x')),
-                PopupMenuItem(value: 2.2, child: Text('1.5x')),
-                PopupMenuItem(value: 3.2, child: Text('2x')),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  _speedLabel(autoScrollSpeed),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+        decoration: BoxDecoration(
+          color: performance ? Colors.black : AppColors.surface,
+          border: const Border(bottom: BorderSide(color: AppColors.line)),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(
+            children: [
+              _ToolbarGroup(
+                children: [
+                  IconButton(
+                    tooltip: 'Diminuir tom',
+                    onPressed: () => onTranspose(-1),
+                    icon: const Icon(Icons.remove_rounded),
+                  ),
+                  Text(
+                    'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  IconButton(
+                    tooltip: 'Aumentar tom',
+                    onPressed: () => onTranspose(1),
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              _ToolbarGroup(
+                children: [
+                  IconButton(
+                    tooltip: 'Diminuir texto',
+                    onPressed: () => onFont(-1),
+                    icon: const Icon(Icons.text_decrease_rounded),
+                  ),
+                  Text(
+                    '${fontSize.round()}',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Aumentar texto',
+                    onPressed: () => onFont(1),
+                    icon: const Icon(Icons.text_increase_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              _ToolbarGroup(
+                children: [
+                  IconButton(
+                    tooltip: 'Lista de acordes',
+                    onPressed: onToggleChords,
+                    color: showChords ? AppColors.teal : null,
+                    icon: const Icon(Icons.piano_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Auto rolagem',
+                    onPressed: onAutoScroll,
+                    color: autoScroll ? AppColors.teal : null,
+                    icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                  ),
+                  SizedBox(
+                    width: 214,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 72,
+                          child: Text(
+                            _speedLabel(autoScrollSpeed),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Slider(
+                            min: 0.1,
+                            max: 1.0,
+                            divisions: 9,
+                            value: autoScrollSpeed.clamp(0.1, 1.0).toDouble(),
+                            label: _speedLabel(autoScrollSpeed),
+                            onChanged: onAutoScrollSpeed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (performance) ...[
+                const SizedBox(width: 10),
+                IconButton.filledTonal(
+                  tooltip: 'Sair do modo palco',
+                  onPressed: onExitPerformance,
+                  icon: const Icon(Icons.fullscreen_exit_rounded),
                 ),
-              ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompact(BuildContext context) {
+    final speed = autoScrollSpeed.clamp(0.1, 1.0).toDouble();
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: BoxDecoration(
+          color: performance ? Colors.black : AppColors.surface,
+          border: const Border(bottom: BorderSide(color: AppColors.line)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _CompactToolbarGroup(
+                    children: [
+                      _compactIconButton(
+                        tooltip: 'Diminuir tom',
+                        onPressed: () => onTranspose(-1),
+                        icon: Icons.remove_rounded,
+                      ),
+                      SizedBox(
+                        width: 76,
+                        child: Text(
+                          'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      _compactIconButton(
+                        tooltip: 'Aumentar tom',
+                        onPressed: () => onTranspose(1),
+                        icon: Icons.add_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CompactToolbarGroup(
+                  children: [
+                    _compactIconButton(
+                      tooltip: 'Diminuir texto',
+                      onPressed: () => onFont(-1),
+                      icon: Icons.text_decrease_rounded,
+                    ),
+                    SizedBox(
+                      width: 30,
+                      child: Text(
+                        '${fontSize.round()}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    _compactIconButton(
+                      tooltip: 'Aumentar texto',
+                      onPressed: () => onFont(1),
+                      icon: Icons.text_increase_rounded,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            if (performance)
-              IconButton(
-                onPressed: onExitPerformance,
-                icon: const Icon(Icons.fullscreen_exit_rounded),
-              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _CompactToolbarGroup(
+                  children: [
+                    _compactIconButton(
+                      tooltip: 'Lista de acordes',
+                      onPressed: onToggleChords,
+                      color: showChords ? AppColors.teal : null,
+                      icon: Icons.piano_rounded,
+                    ),
+                    _compactIconButton(
+                      tooltip: 'Auto rolagem',
+                      onPressed: onAutoScroll,
+                      color: autoScroll ? AppColors.teal : null,
+                      icon: Icons.keyboard_double_arrow_down_rounded,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    height: 40,
+                    padding: const EdgeInsets.only(left: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 70,
+                          child: Text(
+                            _speedLabel(speed),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Slider(
+                            min: 0.1,
+                            max: 1.0,
+                            divisions: 9,
+                            value: speed,
+                            label: _speedLabel(speed),
+                            onChanged: onAutoScrollSpeed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (performance) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: IconButton.filledTonal(
+                      tooltip: 'Sair do modo palco',
+                      onPressed: onExitPerformance,
+                      icon: const Icon(Icons.fullscreen_exit_rounded),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
+  Widget _compactIconButton({
+    required String tooltip,
+    required VoidCallback onPressed,
+    required IconData icon,
+    Color? color,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      color: color,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      padding: EdgeInsets.zero,
+      iconSize: 20,
+      icon: Icon(icon),
+    );
+  }
+
   String _speedLabel(double value) {
-    if (value <= 0.8) return '0.5x';
-    if (value <= 1.4) return '1x';
-    if (value <= 2.2) return '1.5x';
-    return '2x';
+    final normalized = value.clamp(0.1, 1.0).toDouble();
+    return '${normalized.toStringAsFixed(1)} linha/s';
+  }
+}
+
+class _CompactToolbarGroup extends StatelessWidget {
+  const _CompactToolbarGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Center(
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      ),
+    );
+  }
+}
+
+class _ToolbarGroup extends StatelessWidget {
+  const _ToolbarGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: children),
+    );
   }
 }
 
@@ -1258,23 +1672,38 @@ class TabBlockView extends StatelessWidget {
       height: 1.1,
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 24),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final line in lines)
-              _TabBlockLine(
-                line: line,
-                tabStyle: tabStyle,
-                partStyle: partStyle,
-                chordStyle: chordStyle,
-              ),
-          ],
-        ),
+    final content = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            _TabBlockLine(
+              line: line,
+              tabStyle: tabStyle,
+              partStyle: partStyle,
+              chordStyle: chordStyle,
+            ),
+        ],
       ),
+    );
+
+    if (performance) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 24),
+        child: content,
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6, bottom: 24),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: content,
     );
   }
 }
