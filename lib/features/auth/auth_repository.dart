@@ -137,12 +137,19 @@ class AuthRepository {
   }
 
   Future<void> initializeGoogleSignIn() {
+    if (kIsWeb && AppConfig.googleWebClientId.isEmpty) {
+      _googleInitialization = null;
+      throw const ApiException(
+        'GOOGLE_WEB_CLIENT_ID nao foi configurado no build do front.',
+      );
+    }
+
     return _googleInitialization ??= GoogleSignIn.instance
         .initialize(
           clientId: kIsWeb && AppConfig.googleWebClientId.isNotEmpty
               ? AppConfig.googleWebClientId
               : null,
-          serverClientId: AppConfig.googleServerClientId.isNotEmpty
+          serverClientId: !kIsWeb && AppConfig.googleServerClientId.isNotEmpty
               ? AppConfig.googleServerClientId
               : null,
         )

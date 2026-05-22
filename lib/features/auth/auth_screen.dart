@@ -28,6 +28,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _description = TextEditingController();
   StreamSubscription<GoogleSignInAuthenticationEvent>? _googleAuthSubscription;
   var _register = false;
+  var _googleSignInReady = false;
+  String? _googleSignInError;
   String? _profileImageUrl;
 
   @override
@@ -191,11 +193,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: Text(_register ? 'Criar e entrar' : 'Entrar'),
                     ),
                     const SizedBox(height: 12),
-                    buildGoogleSignInButton(
-                      loading: loading,
-                      onPressed: () =>
-                          ref.read(authControllerProvider.notifier).google(),
-                    ),
+                    if (_googleSignInError == null)
+                      buildGoogleSignInButton(
+                        loading: loading || !_googleSignInReady,
+                        onPressed: () =>
+                            ref.read(authControllerProvider.notifier).google(),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.g_mobiledata, size: 28),
+                        label: const Text('Google indisponivel'),
+                      ),
                     TextButton(
                       onPressed: loading
                           ? null
@@ -279,9 +288,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           _showMessage(userMessage(error));
         },
       );
+      if (!mounted) return;
+      setState(() {
+        _googleSignInReady = true;
+        _googleSignInError = null;
+      });
     } catch (error) {
       if (!mounted) return;
-      _showMessage(userMessage(error));
+      final message = userMessage(error);
+      setState(() {
+        _googleSignInReady = false;
+        _googleSignInError = message;
+      });
+      _showMessage(message);
     }
   }
 
