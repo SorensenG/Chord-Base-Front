@@ -77,6 +77,7 @@ class _UsersList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     if (users.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(20),
@@ -120,10 +121,7 @@ class _UsersList extends ConsumerWidget {
                           user.userName,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        Text(
-                          user.email,
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
+                        Text(user.email, style: TextStyle(color: colors.muted)),
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 6,

@@ -43,12 +43,14 @@ class PageHeader extends StatelessWidget {
     this.subtitle,
     this.leading,
     this.actions = const [],
+    this.stackCompactActions = false,
   });
 
   final String title;
   final String? subtitle;
   final Widget? leading;
   final List<Widget> actions;
+  final bool stackCompactActions;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,33 @@ class PageHeader extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 640;
         if (compact) {
+          if (stackCompactActions) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (leading != null) ...[
+                      leading!,
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: _PageHeaderText(title: title, subtitle: subtitle),
+                    ),
+                  ],
+                ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  for (final action in actions) ...[
+                    SizedBox(width: double.infinity, child: action),
+                    if (action != actions.last) const SizedBox(height: 8),
+                  ],
+                ],
+              ],
+            );
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -65,30 +94,23 @@ class PageHeader extends StatelessWidget {
                 children: [
                   if (leading != null) ...[leading!, const SizedBox(width: 12)],
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 5),
-                          Text(
-                            subtitle!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: colors.muted),
-                          ),
-                        ],
-                      ],
-                    ),
+                    child: _PageHeaderText(title: title, subtitle: subtitle),
                   ),
                   if (actions.isNotEmpty) ...[
                     const SizedBox(width: 10),
-                    Row(mainAxisSize: MainAxisSize.min, children: actions),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: actions,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -129,6 +151,38 @@ class PageHeader extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _PageHeaderText extends StatelessWidget {
+  const _PageHeaderText({required this.title, required this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 5),
+          Text(
+            subtitle!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: colors.muted),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -425,7 +479,12 @@ class ImportReviewLayout extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              PageHeader(title: title, subtitle: subtitle, actions: actions),
+              PageHeader(
+                title: title,
+                subtitle: subtitle,
+                actions: actions,
+                stackCompactActions: true,
+              ),
               const SizedBox(height: 18),
               if (wide)
                 IntrinsicHeight(

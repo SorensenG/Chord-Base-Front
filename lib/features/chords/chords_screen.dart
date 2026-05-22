@@ -39,9 +39,26 @@ Future<String?> runChordImportFlow(
   final file = await FilePicker.platform.pickFiles(
     withData: true,
     type: FileType.custom,
-    allowedExtensions: ['pdf', 'txt', 'png', 'jpg', 'jpeg'],
+    allowedExtensions: [
+      'pdf',
+      'txt',
+      'png',
+      'jpg',
+      'jpeg',
+      'webp',
+      'heic',
+      'heif',
+    ],
   );
   if (file == null || file.files.isEmpty || !context.mounted) return null;
+
+  final selectedFile = file.files.single;
+  if (isChordUploadTooLarge(selectedFile)) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text(chordUploadTooLargeMessage)));
+    return null;
+  }
 
   var dialogOpen = true;
   showDialog<void>(
@@ -53,7 +70,7 @@ Future<String?> runChordImportFlow(
   try {
     final preview = await ref
         .read(chordsRepositoryProvider)
-        .preview(file.files.single);
+        .preview(selectedFile);
     if (!context.mounted) return null;
     if (dialogOpen) {
       Navigator.of(context, rootNavigator: true).pop();
@@ -519,22 +536,37 @@ class _ChordReviewScreenState extends ConsumerState<ChordReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return ImportReviewLayout(
       title: 'Revisar cifra',
       subtitle: 'Confira o ChordPro extraido antes de publicar.',
       details: Column(
         children: [
-          Row(
-            children: [
-              StatusBadge(label: widget.preview.status),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Revise acordes, secoes e tablaturas antes de salvar.',
-                  style: TextStyle(color: AppColors.muted),
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 420;
+              final note = Text(
+                'Revise acordes, secoes e tablaturas antes de salvar.',
+                style: TextStyle(color: colors.muted),
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    StatusBadge(label: widget.preview.status),
+                    const SizedBox(height: 8),
+                    note,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  StatusBadge(label: widget.preview.status),
+                  const SizedBox(width: 10),
+                  Expanded(child: note),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           TextField(
@@ -629,6 +661,7 @@ class _ChordPreviewPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final document = ChordProDocument.parse(chordPro);
     final playerItems = _PlayerItem.fromLines(document.lines);
     return Column(
@@ -641,7 +674,7 @@ class _ChordPreviewPane extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           artist.isEmpty ? 'Artista nao informado' : artist,
-          style: const TextStyle(color: AppColors.muted),
+          style: TextStyle(color: colors.muted),
         ),
         const Divider(height: 24),
         for (final item in playerItems.take(80))
@@ -661,11 +694,11 @@ class _ChordPreviewPane extends StatelessWidget {
           else
             ChordLineView(line: item.line!, fontSize: 13, performance: false),
         if (playerItems.length > 80)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Preview reduzido. Abra o modo reproducao para ver tudo.',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
+              style: TextStyle(color: colors.muted, fontSize: 12),
             ),
           ),
       ],
@@ -778,12 +811,13 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final document = ChordProDocument.parse(
       widget.chord.chordPro,
     ).transpose(_transpose);
     final playerItems = _PlayerItem.fromLines(document.lines);
     return Scaffold(
-      backgroundColor: _performance ? Colors.black : AppColors.ink,
+      backgroundColor: _performance ? Colors.black : colors.ink,
       appBar: _performance
           ? null
           : AppBar(
@@ -793,10 +827,7 @@ class _ChordPlayerScreenState extends State<ChordPlayerScreen>
                   Text(widget.chord.chordName),
                   Text(
                     widget.chord.artist,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
+                    style: TextStyle(fontSize: 12, color: colors.muted),
                   ),
                 ],
               ),
@@ -964,112 +995,137 @@ class PlayerToolbar extends StatelessWidget {
   }
 
   Widget _buildWide(BuildContext context) {
+    final colors = context.appColors;
     return SafeArea(
       bottom: false,
       child: Container(
         decoration: BoxDecoration(
-          color: performance ? Colors.black : AppColors.surface,
-          border: const Border(bottom: BorderSide(color: AppColors.line)),
+          color: performance ? Colors.black : colors.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: performance ? AppColors.line : colors.line,
+            ),
+          ),
         ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: Row(
-            children: [
-              _ToolbarGroup(
-                children: [
-                  IconButton(
-                    tooltip: 'Diminuir tom',
-                    onPressed: () => onTranspose(-1),
-                    icon: const Icon(Icons.remove_rounded),
-                  ),
-                  Text(
-                    'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  IconButton(
-                    tooltip: 'Aumentar tom',
-                    onPressed: () => onTranspose(1),
-                    icon: const Icon(Icons.add_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              _ToolbarGroup(
-                children: [
-                  IconButton(
-                    tooltip: 'Diminuir texto',
-                    onPressed: () => onFont(-1),
-                    icon: const Icon(Icons.text_decrease_rounded),
-                  ),
-                  Text(
-                    '${fontSize.round()}',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w800,
+        child: IconTheme(
+          data: IconThemeData(color: performance ? Colors.white : colors.text),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Row(
+              children: [
+                _ToolbarGroup(
+                  performance: performance,
+                  children: [
+                    IconButton(
+                      tooltip: 'Diminuir tom',
+                      onPressed: () => onTranspose(-1),
+                      icon: const Icon(Icons.remove_rounded),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Aumentar texto',
-                    onPressed: () => onFont(1),
-                    icon: const Icon(Icons.text_increase_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              _ToolbarGroup(
-                children: [
-                  IconButton(
-                    tooltip: 'Lista de acordes',
-                    onPressed: onToggleChords,
-                    color: showChords ? AppColors.teal : null,
-                    icon: const Icon(Icons.piano_rounded),
-                  ),
-                  IconButton(
-                    tooltip: 'Auto rolagem',
-                    onPressed: onAutoScroll,
-                    color: autoScroll ? AppColors.teal : null,
-                    icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
-                  ),
-                  SizedBox(
-                    width: 214,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 72,
-                          child: Text(
-                            _speedLabel(autoScrollSpeed),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                    Text(
+                      'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
+                      style: TextStyle(
+                        color: performance ? Colors.white : colors.text,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Aumentar tom',
+                      onPressed: () => onTranspose(1),
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                _ToolbarGroup(
+                  performance: performance,
+                  children: [
+                    IconButton(
+                      tooltip: 'Diminuir texto',
+                      onPressed: () => onFont(-1),
+                      icon: const Icon(Icons.text_decrease_rounded),
+                    ),
+                    Text(
+                      '${fontSize.round()}',
+                      style: TextStyle(
+                        color: performance ? AppColors.muted : colors.muted,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Aumentar texto',
+                      onPressed: () => onFont(1),
+                      icon: const Icon(Icons.text_increase_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                _ToolbarGroup(
+                  performance: performance,
+                  children: [
+                    IconButton(
+                      tooltip: 'Lista de acordes',
+                      onPressed: onToggleChords,
+                      color: showChords
+                          ? AppColors.teal
+                          : performance
+                          ? Colors.white
+                          : null,
+                      icon: const Icon(Icons.piano_rounded),
+                    ),
+                    IconButton(
+                      tooltip: 'Auto rolagem',
+                      onPressed: onAutoScroll,
+                      color: autoScroll
+                          ? AppColors.teal
+                          : performance
+                          ? Colors.white
+                          : null,
+                      icon: const Icon(
+                        Icons.keyboard_double_arrow_down_rounded,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 214,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 72,
+                            child: Text(
+                              _speedLabel(autoScrollSpeed),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: performance ? Colors.white : colors.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: Slider(
-                            min: 0.1,
-                            max: 1.0,
-                            divisions: 9,
-                            value: autoScrollSpeed.clamp(0.1, 1.0).toDouble(),
-                            label: _speedLabel(autoScrollSpeed),
-                            onChanged: onAutoScrollSpeed,
+                          Expanded(
+                            child: Slider(
+                              min: 0.1,
+                              max: 1.0,
+                              divisions: 9,
+                              value: autoScrollSpeed.clamp(0.1, 1.0).toDouble(),
+                              label: _speedLabel(autoScrollSpeed),
+                              onChanged: onAutoScrollSpeed,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+                if (performance) ...[
+                  const SizedBox(width: 10),
+                  IconButton.filledTonal(
+                    tooltip: 'Sair do modo palco',
+                    onPressed: onExitPerformance,
+                    icon: const Icon(Icons.fullscreen_exit_rounded),
                   ),
                 ],
-              ),
-              if (performance) ...[
-                const SizedBox(width: 10),
-                IconButton.filledTonal(
-                  tooltip: 'Sair do modo palco',
-                  onPressed: onExitPerformance,
-                  icon: const Icon(Icons.fullscreen_exit_rounded),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1077,146 +1133,173 @@ class PlayerToolbar extends StatelessWidget {
   }
 
   Widget _buildCompact(BuildContext context) {
+    final colors = context.appColors;
     final speed = autoScrollSpeed.clamp(0.1, 1.0).toDouble();
     return SafeArea(
       bottom: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         decoration: BoxDecoration(
-          color: performance ? Colors.black : AppColors.surface,
-          border: const Border(bottom: BorderSide(color: AppColors.line)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _CompactToolbarGroup(
-                    children: [
-                      _compactIconButton(
-                        tooltip: 'Diminuir tom',
-                        onPressed: () => onTranspose(-1),
-                        icon: Icons.remove_rounded,
-                      ),
-                      SizedBox(
-                        width: 76,
-                        child: Text(
-                          'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                      _compactIconButton(
-                        tooltip: 'Aumentar tom',
-                        onPressed: () => onTranspose(1),
-                        icon: Icons.add_rounded,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _CompactToolbarGroup(
-                  children: [
-                    _compactIconButton(
-                      tooltip: 'Diminuir texto',
-                      onPressed: () => onFont(-1),
-                      icon: Icons.text_decrease_rounded,
-                    ),
-                    SizedBox(
-                      width: 30,
-                      child: Text(
-                        '${fontSize.round()}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    _compactIconButton(
-                      tooltip: 'Aumentar texto',
-                      onPressed: () => onFont(1),
-                      icon: Icons.text_increase_rounded,
-                    ),
-                  ],
-                ),
-              ],
+          color: performance ? Colors.black : colors.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: performance ? AppColors.line : colors.line,
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _CompactToolbarGroup(
-                  children: [
-                    _compactIconButton(
-                      tooltip: 'Lista de acordes',
-                      onPressed: onToggleChords,
-                      color: showChords ? AppColors.teal : null,
-                      icon: Icons.piano_rounded,
-                    ),
-                    _compactIconButton(
-                      tooltip: 'Auto rolagem',
-                      onPressed: onAutoScroll,
-                      color: autoScroll ? AppColors.teal : null,
-                      icon: Icons.keyboard_double_arrow_down_rounded,
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    height: 40,
-                    padding: const EdgeInsets.only(left: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(AppRadii.lg),
-                      border: Border.all(color: AppColors.line),
-                    ),
-                    child: Row(
+          ),
+        ),
+        child: IconTheme(
+          data: IconThemeData(color: performance ? Colors.white : colors.text),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _CompactToolbarGroup(
+                      performance: performance,
                       children: [
+                        _compactIconButton(
+                          tooltip: 'Diminuir tom',
+                          onPressed: () => onTranspose(-1),
+                          icon: Icons.remove_rounded,
+                        ),
                         SizedBox(
-                          width: 70,
+                          width: 76,
                           child: Text(
-                            _speedLabel(speed),
+                            'Tom ${transpose >= 0 ? '+$transpose' : transpose}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: performance ? Colors.white : colors.text,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: Slider(
-                            min: 0.1,
-                            max: 1.0,
-                            divisions: 9,
-                            value: speed,
-                            label: _speedLabel(speed),
-                            onChanged: onAutoScrollSpeed,
-                          ),
+                        _compactIconButton(
+                          tooltip: 'Aumentar tom',
+                          onPressed: () => onTranspose(1),
+                          icon: Icons.add_rounded,
                         ),
                       ],
                     ),
                   ),
-                ),
-                if (performance) ...[
                   const SizedBox(width: 8),
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: IconButton.filledTonal(
-                      tooltip: 'Sair do modo palco',
-                      onPressed: onExitPerformance,
-                      icon: const Icon(Icons.fullscreen_exit_rounded),
-                    ),
+                  _CompactToolbarGroup(
+                    performance: performance,
+                    children: [
+                      _compactIconButton(
+                        tooltip: 'Diminuir texto',
+                        onPressed: () => onFont(-1),
+                        icon: Icons.text_decrease_rounded,
+                      ),
+                      SizedBox(
+                        width: 30,
+                        child: Text(
+                          '${fontSize.round()}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: performance ? AppColors.muted : colors.muted,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      _compactIconButton(
+                        tooltip: 'Aumentar texto',
+                        onPressed: () => onFont(1),
+                        icon: Icons.text_increase_rounded,
+                      ),
+                    ],
                   ),
                 ],
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _CompactToolbarGroup(
+                    performance: performance,
+                    children: [
+                      _compactIconButton(
+                        tooltip: 'Lista de acordes',
+                        onPressed: onToggleChords,
+                        color: showChords
+                            ? AppColors.teal
+                            : performance
+                            ? Colors.white
+                            : null,
+                        icon: Icons.piano_rounded,
+                      ),
+                      _compactIconButton(
+                        tooltip: 'Auto rolagem',
+                        onPressed: onAutoScroll,
+                        color: autoScroll
+                            ? AppColors.teal
+                            : performance
+                            ? Colors.white
+                            : null,
+                        icon: Icons.keyboard_double_arrow_down_rounded,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      padding: const EdgeInsets.only(left: 10),
+                      decoration: BoxDecoration(
+                        color: performance
+                            ? AppColors.surface
+                            : colors.surface2,
+                        borderRadius: BorderRadius.circular(AppRadii.lg),
+                        border: Border.all(
+                          color: performance ? AppColors.line : colors.line,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 70,
+                            child: Text(
+                              _speedLabel(speed),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: performance ? Colors.white : colors.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Slider(
+                              min: 0.1,
+                              max: 1.0,
+                              divisions: 9,
+                              value: speed,
+                              label: _speedLabel(speed),
+                              onChanged: onAutoScrollSpeed,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (performance) ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: IconButton.filledTonal(
+                        tooltip: 'Sair do modo palco',
+                        onPressed: onExitPerformance,
+                        icon: const Icon(Icons.fullscreen_exit_rounded),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1247,19 +1330,24 @@ class PlayerToolbar extends StatelessWidget {
 }
 
 class _CompactToolbarGroup extends StatelessWidget {
-  const _CompactToolbarGroup({required this.children});
+  const _CompactToolbarGroup({
+    required this.children,
+    required this.performance,
+  });
 
   final List<Widget> children;
+  final bool performance;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: performance ? AppColors.surface : colors.surface2,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: performance ? AppColors.line : colors.line),
       ),
       child: Center(
         child: Row(mainAxisSize: MainAxisSize.min, children: children),
@@ -1269,18 +1357,20 @@ class _CompactToolbarGroup extends StatelessWidget {
 }
 
 class _ToolbarGroup extends StatelessWidget {
-  const _ToolbarGroup({required this.children});
+  const _ToolbarGroup({required this.children, required this.performance});
 
   final List<Widget> children;
+  final bool performance;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       height: 42,
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: performance ? AppColors.surface : colors.surface2,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: performance ? AppColors.line : colors.line),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: children),
     );
@@ -1398,17 +1488,18 @@ class CueLyricLineView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final lyricStyle = TextStyle(
       fontSize: fontSize,
       letterSpacing: 0,
       height: 1.18,
-      color: performance ? Colors.white : AppColors.text,
+      color: performance ? Colors.white : colors.text,
     );
     final cueStyle = TextStyle(
       fontSize: fontSize,
       letterSpacing: 0,
       height: 1.05,
-      color: performance ? Colors.white : AppColors.text,
+      color: performance ? Colors.white : colors.text,
     );
 
     return Padding(
@@ -1420,6 +1511,7 @@ class CueLyricLineView extends StatelessWidget {
           lyricLine: lyricLine,
           lyricStyle: lyricStyle,
           cueStyle: cueStyle,
+          performance: performance,
         ),
       ),
     );
@@ -1432,12 +1524,14 @@ class _MeasuredCueLyricLine extends StatelessWidget {
     required this.lyricLine,
     required this.lyricStyle,
     required this.cueStyle,
+    required this.performance,
   });
 
   final ChordProLine cueLine;
   final ChordProLine lyricLine;
   final TextStyle lyricStyle;
   final TextStyle cueStyle;
+  final bool performance;
 
   @override
   Widget build(BuildContext context) {
@@ -1477,7 +1571,11 @@ class _MeasuredCueLyricLine extends StatelessWidget {
           Positioned(
             left: cueLeft,
             top: 0,
-            child: _CueRichText(line: cueLine, fontSize: cueStyle.fontSize),
+            child: _CueRichText(
+              line: cueLine,
+              fontSize: cueStyle.fontSize,
+              performance: performance,
+            ),
           ),
           Positioned(
             left: 0,
@@ -1527,6 +1625,7 @@ class ChordLineView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (line.type == ChordLineType.empty) return const SizedBox(height: 14);
     if (line.type == ChordLineType.directive) {
       return Padding(
@@ -1546,7 +1645,11 @@ class ChordLineView extends StatelessWidget {
         padding: const EdgeInsets.only(top: 4, bottom: 12),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: _CueRichText(line: line, fontSize: fontSize),
+          child: _CueRichText(
+            line: line,
+            fontSize: fontSize,
+            performance: performance,
+          ),
         ),
       );
     }
@@ -1564,7 +1667,7 @@ class ChordLineView extends StatelessWidget {
               fontSize: fontSize,
               letterSpacing: 0,
               height: 1.2,
-              color: performance ? Colors.white : AppColors.text,
+              color: performance ? Colors.white : colors.text,
             ),
           ),
         ),
@@ -1575,7 +1678,7 @@ class ChordLineView extends StatelessWidget {
       fontSize: fontSize,
       letterSpacing: 0,
       height: line.chordPlacements.isEmpty ? 1.35 : 1.18,
-      color: performance ? Colors.white : AppColors.text,
+      color: performance ? Colors.white : colors.text,
     );
     final chordStyle = TextStyle(
       fontSize: fontSize,
@@ -1600,13 +1703,19 @@ class ChordLineView extends StatelessWidget {
 }
 
 class _CueRichText extends StatelessWidget {
-  const _CueRichText({required this.line, this.fontSize});
+  const _CueRichText({
+    required this.line,
+    this.fontSize,
+    required this.performance,
+  });
 
   final ChordProLine line;
   final double? fontSize;
+  final bool performance;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final cueChord = line.cueChord;
     final cueLabel = line.cueLabel;
 
@@ -1615,7 +1724,7 @@ class _CueRichText extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           letterSpacing: 0,
-          color: AppColors.text,
+          color: performance ? Colors.white : colors.text,
         ),
         children: [
           if (cueChord != null)
@@ -1630,8 +1739,8 @@ class _CueRichText extends StatelessWidget {
           if (cueLabel != null)
             TextSpan(
               text: cueLabel,
-              style: const TextStyle(
-                color: AppColors.muted,
+              style: TextStyle(
+                color: performance ? AppColors.muted : colors.muted,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1655,17 +1764,18 @@ class TabBlockView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final tabStyle = TextStyle(
       fontFamily: _tabFontFamily,
       fontFamilyFallback: _monoFontFallback,
       fontSize: fontSize,
       letterSpacing: 0,
       height: 1.18,
-      color: performance ? Colors.white : AppColors.text,
+      color: performance ? Colors.white : colors.text,
     );
     final partStyle = tabStyle.copyWith(
       fontWeight: FontWeight.w700,
-      color: performance ? Colors.white : AppColors.text,
+      color: performance ? Colors.white : colors.text,
     );
     final chordStyle = tabStyle.copyWith(
       color: AppColors.teal,
@@ -1700,9 +1810,9 @@ class TabBlockView extends StatelessWidget {
       margin: const EdgeInsets.only(top: 6, bottom: 24),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: colors.surface2,
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: colors.line),
       ),
       child: content,
     );

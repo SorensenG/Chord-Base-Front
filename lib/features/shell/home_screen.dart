@@ -557,6 +557,7 @@ class _NotificationsBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     final invites = ref.watch(_invitesProvider);
     final chords = ref.watch(myChordsProvider);
     return SafeArea(
@@ -574,9 +575,9 @@ class _NotificationsBottomSheet extends ConsumerWidget {
           children: [
             Text('Pendencias', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Convites e cifras que precisam de revisao.',
-              style: TextStyle(color: AppColors.muted),
+              style: TextStyle(color: colors.muted),
             ),
             const SizedBox(height: 18),
             invites.when(
@@ -674,6 +675,7 @@ class _InviteTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -697,7 +699,7 @@ class _InviteTile extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Convite de ${invite.ownerUserName}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                  style: TextStyle(color: colors.muted, fontSize: 12),
                 ),
               ],
             ),

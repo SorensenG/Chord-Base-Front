@@ -44,6 +44,7 @@ class SetlistsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.appColors;
     final setlists = ref.watch(setlistsProvider);
     final invites = ref.watch(invitesProvider);
     final currentUserUuid = ref
@@ -106,8 +107,8 @@ class SetlistsScreen extends ConsumerWidget {
                                   ),
                                   Text(
                                     'Convite de ${invite.ownerUserName}',
-                                    style: const TextStyle(
-                                      color: AppColors.muted,
+                                    style: TextStyle(
+                                      color: colors.muted,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -250,11 +251,12 @@ class _SetlistSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Material(
-      color: AppColors.surface2,
+      color: colors.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: colors.line),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -292,10 +294,7 @@ class _SetlistSummaryRow extends StatelessWidget {
                       '${setlist.chords.length} cifras • ${setlist.ownerUserName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: colors.muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -316,7 +315,7 @@ class _SetlistSummaryRow extends StatelessWidget {
                   ],
                 )
               else
-                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                Icon(Icons.chevron_right_rounded, color: colors.muted),
             ],
           ),
         ),
@@ -706,9 +705,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             ),
             const SizedBox(height: 12),
             if (collaborators.isEmpty)
-              const Text(
+              Text(
                 'Nenhum colaborador.',
-                style: TextStyle(color: AppColors.muted),
+                style: TextStyle(color: context.appColors.muted),
               ),
             for (final collaborator in collaborators)
               ListTile(
@@ -766,13 +765,14 @@ class _SetlistChordRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: AppColors.surface2,
+        color: colors.surface2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.lg),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: colors.line),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -785,8 +785,8 @@ class _SetlistChordRow extends StatelessWidget {
                   width: 34,
                   child: Text(
                     '${index + 1}'.padLeft(2, '0'),
-                    style: const TextStyle(
-                      color: AppColors.muted,
+                    style: TextStyle(
+                      color: colors.muted,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -806,10 +806,7 @@ class _SetlistChordRow extends StatelessWidget {
                         chord.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: colors.muted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -819,10 +816,7 @@ class _SetlistChordRow extends StatelessWidget {
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline_rounded),
                 ),
-                const Icon(
-                  Icons.drag_indicator_rounded,
-                  color: AppColors.muted,
-                ),
+                Icon(Icons.drag_indicator_rounded, color: colors.muted),
               ],
             ),
           ),
@@ -938,13 +932,14 @@ class _PlaylistBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.line)),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border(top: BorderSide(color: colors.line)),
         ),
         child: Row(
           children: [
@@ -960,10 +955,7 @@ class _PlaylistBar extends StatelessWidget {
                 children: [
                   Text(
                     '$setlistName • ${currentIndex + 1}/$total',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: colors.muted, fontSize: 12),
                   ),
                   Text(
                     current.chordName,

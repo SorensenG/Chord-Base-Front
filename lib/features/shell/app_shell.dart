@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
 import '../../core/theme.dart';
+import '../../core/tutorial.dart';
 import '../../core/user_messages.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/app_layout.dart';
@@ -26,7 +27,27 @@ class _AppShellState extends ConsumerState<AppShell> {
   var _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref
+          .read(tutorialControllerProvider.notifier)
+          .startAutomaticTourIfNeeded();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    ref.listen<TutorialState>(tutorialControllerProvider, (previous, next) {
+      if (!next.isRunning || previous?.stepIndex == next.stepIndex) return;
+      final tabIndex = _tabIndexForTutorialStep(next.stepIndex);
+      if (tabIndex == _index) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _index = tabIndex);
+      });
+    });
+    final tutorial = ref.watch(tutorialControllerProvider);
     final destinations = [
       _Destination(
         'Home',
@@ -48,7 +69,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       _Destination(
         'Perfil',
         Icons.person_rounded,
-        ProfileScreen(user: widget.user),
+        ProfileScreen(user: widget.user, onStartTutorial: _startTutorial),
       ),
       if (widget.user.isAdmin)
         const _Destination(
@@ -60,34 +81,50 @@ class _AppShellState extends ConsumerState<AppShell> {
     final wide = MediaQuery.sizeOf(context).width >= 820;
     final colors = context.appColors;
 
-    return Scaffold(
-      body: Row(
-        children: [
-          if (wide)
-            _SideBar(
-              user: widget.user,
-              destinations: destinations,
-              selectedIndex: _index,
-              onSelected: (value) => setState(() => _index = value),
-            ),
-          Expanded(child: destinations[_index].screen),
-        ],
-      ),
-      bottomNavigationBar: wide
-          ? null
-          : NavigationBar(
-              selectedIndex: _index,
-              backgroundColor: colors.surface,
-              indicatorColor: AppColors.teal.withValues(alpha: 0.16),
-              onDestinationSelected: (value) => setState(() => _index = value),
-              destinations: [
-                for (final item in destinations)
-                  NavigationDestination(
-                    icon: Icon(item.icon),
-                    label: item.label,
-                  ),
-              ],
-            ),
+    return Stack(
+      children: [
+        Scaffold(
+          body: Row(
+            children: [
+              if (wide)
+                _SideBar(
+                  user: widget.user,
+                  destinations: destinations,
+                  selectedIndex: _index,
+                  onSelected: (value) => setState(() => _index = value),
+                ),
+              Expanded(child: destinations[_index].screen),
+            ],
+          ),
+          bottomNavigationBar: wide
+              ? null
+              : NavigationBar(
+                  selectedIndex: _index,
+                  backgroundColor: colors.surface,
+                  indicatorColor: AppColors.teal.withValues(alpha: 0.16),
+                  onDestinationSelected: (value) =>
+                      setState(() => _index = value),
+                  destinations: [
+                    for (final item in destinations)
+                      NavigationDestination(
+                        icon: Icon(item.icon),
+                        label: item.label,
+                      ),
+                  ],
+                ),
+        ),
+        if (tutorial.isRunning)
+          TutorialOverlay(
+            stepIndex: tutorial.stepIndex,
+            onBack: ref.read(tutorialControllerProvider.notifier).previousStep,
+            onNext: () {
+              ref.read(tutorialControllerProvider.notifier).nextStep();
+            },
+            onSkip: () {
+              ref.read(tutorialControllerProvider.notifier).skipTour();
+            },
+          ),
+      ],
     );
   }
 
@@ -116,6 +153,22 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (!mounted) return;
       showSetlistForm(context, ref);
     });
+  }
+
+  void _startTutorial() {
+    setState(() => _index = 0);
+    ref.read(tutorialControllerProvider.notifier).startManualTour();
+  }
+
+  int _tabIndexForTutorialStep(int stepIndex) {
+    return switch (stepIndex) {
+      0 => 0,
+      1 => 1,
+      2 => 2,
+      3 => 3,
+      4 => 1,
+      _ => 0,
+    };
   }
 }
 
@@ -270,9 +323,14 @@ class _Destination {
 }
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key, required this.user});
+  const ProfileScreen({
+    super.key,
+    required this.user,
+    required this.onStartTutorial,
+  });
 
   final UserProfile user;
+  final VoidCallback onStartTutorial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -356,6 +414,11 @@ class ProfileScreen extends ConsumerWidget {
                             onPressed: () => _editProfile(context, ref, user),
                             icon: const Icon(Icons.edit_note_rounded),
                             label: const Text('Editar perfil'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: onStartTutorial,
+                            icon: const Icon(Icons.tips_and_updates_rounded),
+                            label: const Text('Ver tutorial novamente'),
                           ),
                         ],
                       ),
@@ -459,4 +522,172 @@ class ProfileScreen extends ConsumerWidget {
       showUserMessage(context, error);
     }
   }
+}
+
+class TutorialOverlay extends StatelessWidget {
+  const TutorialOverlay({
+    super.key,
+    required this.stepIndex,
+    required this.onBack,
+    required this.onNext,
+    required this.onSkip,
+  });
+
+  final int stepIndex;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+  final VoidCallback onSkip;
+
+  static const _steps = [
+    _TutorialStep(
+      icon: Icons.dashboard_rounded,
+      title: 'Comece pela Home',
+      body:
+          'A Home mostra pendencias, atividades recentes e atalhos para importar cifras ou montar setlists.',
+    ),
+    _TutorialStep(
+      icon: Icons.library_music_rounded,
+      title: 'Organize suas cifras',
+      body:
+          'Em Cifras voce busca sua biblioteca, revisa importacoes e abre qualquer musica para tocar.',
+    ),
+    _TutorialStep(
+      icon: Icons.queue_music_rounded,
+      title: 'Monte repertorios',
+      body:
+          'Em Setlists voce agrupa musicas por ensaio, culto, show ou estudo e toca tudo em sequencia.',
+    ),
+    _TutorialStep(
+      icon: Icons.person_rounded,
+      title: 'Ajuste seu perfil',
+      body:
+          'No Perfil voce troca foto, escreve sua descricao, escolhe o tema e pode abrir este tutorial de novo.',
+    ),
+    _TutorialStep(
+      icon: Icons.play_arrow_rounded,
+      title: 'Use o player de cifra',
+      body:
+          'Ao abrir uma cifra, use tom, tamanho do texto, lista de acordes, auto rolagem e modo palco.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final index = stepIndex.clamp(0, _steps.length - 1);
+    final step = _steps[index];
+    final isLast = index == _steps.length - 1;
+    final compact = MediaQuery.sizeOf(context).width < 640;
+
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.48),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 28),
+            child: Align(
+              alignment: compact ? Alignment.bottomCenter : Alignment.center,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    border: Border.all(color: colors.line),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.22),
+                        blurRadius: 32,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.teal.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                            ),
+                            child: Icon(step.icon, color: AppColors.teal),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Passo ${index + 1} de ${_steps.length}',
+                                  style: TextStyle(
+                                    color: colors.muted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  step.title,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(step.body, style: TextStyle(color: colors.muted)),
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(
+                        value: (index + 1) / _steps.length,
+                        minHeight: 5,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: onSkip,
+                            child: const Text('Pular'),
+                          ),
+                          OutlinedButton(
+                            onPressed: index == 0 ? null : onBack,
+                            child: const Text('Voltar'),
+                          ),
+                          FilledButton(
+                            onPressed: onNext,
+                            child: Text(isLast ? 'Concluir' : 'Proximo'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TutorialStep {
+  const _TutorialStep({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
 }

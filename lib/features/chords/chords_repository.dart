@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
@@ -12,6 +13,8 @@ final chordsRepositoryProvider = Provider<ChordsRepository>((ref) {
 final myChordsProvider = FutureProvider.autoDispose<List<ChordSummary>>((ref) {
   return ref.watch(chordsRepositoryProvider).mine();
 });
+
+const maxChordUploadSizeBytes = 30 * 1024 * 1024;
 
 final chordSearchProvider = FutureProvider.autoDispose
     .family<List<ChordSummary>, String>((ref, query) {
@@ -54,9 +57,18 @@ class ChordsRepository {
   }
 
   Future<ChordPreview> preview(PlatformFile file) async {
+    final contentType = _contentTypeFor(file.name);
     final multipart = file.bytes != null
-        ? MultipartFile.fromBytes(file.bytes!, filename: file.name)
-        : await MultipartFile.fromFile(file.path!, filename: file.name);
+        ? MultipartFile.fromBytes(
+            file.bytes!,
+            filename: file.name,
+            contentType: contentType,
+          )
+        : await MultipartFile.fromFile(
+            file.path!,
+            filename: file.name,
+            contentType: contentType,
+          );
     final response = await _api.multipart<Map<String, dynamic>>(
       '/chord/preview',
       FormData.fromMap({'file': multipart}),
@@ -91,4 +103,26 @@ class ChordsRepository {
   }
 
   Future<void> delete(String uuid) => _api.delete<void>('/chord/$uuid');
+}
+
+@visibleForTesting
+DioMediaType contentTypeForChordUpload(String filename) {
+  final extension = filename.split('.').last.toLowerCase();
+  return switch (extension) {
+    'pdf' => DioMediaType.parse('application/pdf'),
+    'txt' => DioMediaType.parse('text/plain'),
+    'png' => DioMediaType.parse('image/png'),
+    'jpg' || 'jpeg' => DioMediaType.parse('image/jpeg'),
+    'webp' => DioMediaType.parse('image/webp'),
+    'heic' => DioMediaType.parse('image/heic'),
+    'heif' => DioMediaType.parse('image/heif'),
+    _ => DioMediaType.parse('application/octet-stream'),
+  };
+}
+
+DioMediaType _contentTypeFor(String filename) =>
+    contentTypeForChordUpload(filename);
+
+bool isChordUploadTooLarge(PlatformFile file) {
+  return file.size > maxChordUploadSizeBytes;
 }

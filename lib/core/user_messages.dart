@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import 'api_client.dart';
 
+const chordUploadTooLargeMessage =
+    'Arquivo muito grande. Envie uma foto menor ou reduza a qualidade da imagem.';
+
 String userMessage(Object error, {String? fallback}) {
   if (error is ApiException) {
     final message = _messageFromApiException(error);
@@ -37,6 +40,9 @@ String? _messageFromApiException(ApiException error) {
   }
   if (error.statusCode == 404) {
     return 'Não encontramos esse item.';
+  }
+  if (error.statusCode == 413) {
+    return chordUploadTooLargeMessage;
   }
   if (error.statusCode != null && error.statusCode! >= 500) {
     return 'A API encontrou um problema. Tente novamente em instantes.';
@@ -89,6 +95,42 @@ String? _messageFromRawText(String text) {
   }
   if (normalized.contains('file must not be empty')) {
     return 'Envie um arquivo válido.';
+  }
+  if (normalized.contains('unsupported_extension') ||
+      normalized.contains('extensão não suportada') ||
+      normalized.contains('extensao nao suportada')) {
+    return 'Formato não suportado. Envie PDF, PNG, JPG, JPEG, WEBP, HEIC, HEIF ou TXT.';
+  }
+  if (normalized.contains('unsupported_mime_type') ||
+      normalized.contains('tipo de arquivo não suportado') ||
+      normalized.contains('tipo de arquivo nao suportado')) {
+    return 'Tipo de arquivo não suportado. Tente PDF, imagem PNG/JPG/WEBP/HEIC/HEIF ou TXT.';
+  }
+  if (normalized.contains('upload_too_large') ||
+      normalized.contains('maximum upload size exceeded') ||
+      normalized.contains('maxuploadsizeexceededexception') ||
+      normalized.contains('tamanho máximo') ||
+      normalized.contains('tamanho maximo')) {
+    return chordUploadTooLargeMessage;
+  }
+  if (normalized.contains('empty_upload') ||
+      normalized.contains('arquivo vazio')) {
+    return 'O arquivo está vazio. Escolha outro arquivo.';
+  }
+  if (normalized.contains('invalid_image') ||
+      normalized.contains('não foi possível ler a imagem') ||
+      normalized.contains('nao foi possivel ler a imagem')) {
+    return 'Não consegui abrir essa imagem. Se for HEIC/HEIF, confira se o arquivo não está corrompido ou envie JPG/PNG.';
+  }
+  if (normalized.contains('não consegui identificar uma cifra') ||
+      normalized.contains('nao consegui identificar uma cifra') ||
+      normalized.contains('imagem sem cifra') ||
+      normalized.contains('sem sinais de cifra')) {
+    return 'Não consegui identificar uma cifra nessa imagem. Envie uma foto mais nítida, PDF ou TXT.';
+  }
+  if (normalized.contains('não foi possível extrair texto') ||
+      normalized.contains('nao foi possivel extrair texto')) {
+    return 'Não consegui ler texto nessa imagem. Tente uma imagem mais nítida ou envie PDF/TXT.';
   }
   if (normalized.contains('only published chords can be added')) {
     return 'Só cifras publicadas podem entrar em setlists.';
