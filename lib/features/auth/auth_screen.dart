@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/theme.dart';
 import '../../core/user_messages.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/profile_avatar.dart';
 import 'auth_repository.dart';
+import 'google_sign_in_button.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key, this.initialError});
@@ -22,11 +26,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _confirmPassword = TextEditingController();
   final _userName = TextEditingController();
   final _description = TextEditingController();
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleAuthSubscription;
   var _register = false;
   String? _profileImageUrl;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_initializeGoogleSignIn());
+  }
+
+  @override
   void dispose() {
+    unawaited(_googleAuthSubscription?.cancel());
     _email.dispose();
     _password.dispose();
     _confirmPassword.dispose();
@@ -179,14 +191,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: Text(_register ? 'Criar e entrar' : 'Entrar'),
                     ),
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: loading
-                          ? null
-                          : () => ref
-                                .read(authControllerProvider.notifier)
-                                .google(),
-                      icon: const Icon(Icons.g_mobiledata, size: 28),
-                      label: const Text('Continuar com Google'),
+                    buildGoogleSignInButton(
+                      loading: loading,
+                      onPressed: () =>
+                          ref.read(authControllerProvider.notifier).google(),
                     ),
                     TextButton(
                       onPressed: loading
@@ -258,6 +266,34 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _initializeGoogleSignIn() async {
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      await repository.initializeGoogleSignIn();
+      _googleAuthSubscription = repository.googleAuthenticationEvents.listen(
+        _handleGoogleAuthenticationEvent,
+        onError: (Object error) {
+          if (!mounted) return;
+          _showMessage(userMessage(error));
+        },
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(userMessage(error));
+    }
+  }
+
+  void _handleGoogleAuthenticationEvent(GoogleSignInAuthenticationEvent event) {
+    switch (event) {
+      case GoogleSignInAuthenticationEventSignIn(user: final user):
+        unawaited(
+          ref.read(authControllerProvider.notifier).googleAccount(user),
+        );
+      case GoogleSignInAuthenticationEventSignOut():
+        break;
+    }
   }
 
   Future<void> _pickProfileImage() async {

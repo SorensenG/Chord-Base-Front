@@ -30,6 +30,7 @@ class AuthRepository {
   final ApiClient _api;
   final TokenStore _tokens;
   final RecentActivityStore _recentActivityStore;
+  Future<void>? _googleInitialization;
 
   Future<AuthSession> login({
     required String email,
@@ -135,15 +136,27 @@ class AuthRepository {
     await GoogleSignIn.instance.signOut().catchError((_) {});
   }
 
-  Future<void> signInWithGoogle() async {
-    await GoogleSignIn.instance.initialize(
-      clientId: kIsWeb && AppConfig.googleWebClientId.isNotEmpty
-          ? AppConfig.googleWebClientId
-          : null,
-      serverClientId: AppConfig.googleServerClientId.isNotEmpty
-          ? AppConfig.googleServerClientId
-          : null,
-    );
+  Future<void> initializeGoogleSignIn() {
+    return _googleInitialization ??= GoogleSignIn.instance
+        .initialize(
+          clientId: kIsWeb && AppConfig.googleWebClientId.isNotEmpty
+              ? AppConfig.googleWebClientId
+              : null,
+          serverClientId: AppConfig.googleServerClientId.isNotEmpty
+              ? AppConfig.googleServerClientId
+              : null,
+        )
+        .catchError((Object error) {
+          _googleInitialization = null;
+          throw error;
+        });
+  }
+
+  Stream<GoogleSignInAuthenticationEvent> get googleAuthenticationEvents =>
+      GoogleSignIn.instance.authenticationEvents;
+
+  Future<AuthSession> signInWithGoogle() async {
+    await initializeGoogleSignIn();
 
     if (!GoogleSignIn.instance.supportsAuthenticate()) {
       throw const ApiException(
@@ -157,12 +170,51 @@ class AuthRepository {
       throw const ApiException('Google nao retornou um idToken valido.');
     }
 
-    // The current Spring API has no Google auth endpoint yet. Keep the complete
-    // mobile/web sign-in capture here so the backend can later exchange idToken
-    // for the same ChordBase JWT session used by email/password login.
-    throw const ApiException(
-      'Google conectado. Falta a API expor /users/google para trocar o idToken por uma sessao ChordBase.',
+    return _exchangeGoogleIdToken(idToken, fallbackEmail: account.email);
+  }
+
+  Future<AuthSession> signInWithGoogleAccount(
+    GoogleSignInAccount account,
+  ) async {
+    await initializeGoogleSignIn();
+
+    final idToken = account.authentication.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const ApiException('Google nao retornou um idToken valido.');
+    }
+
+    return _exchangeGoogleIdToken(idToken, fallbackEmail: account.email);
+  }
+
+  Future<AuthSession> _exchangeGoogleIdToken(
+    String idToken, {
+    required String fallbackEmail,
+  }) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/users/google',
+      data: {'idToken': idToken},
     );
+    final data = response.data!;
+    final access = jsonNullableText(data, 'accessToken');
+    final refresh = jsonNullableText(data, 'refreshToken');
+    if (access == null || refresh == null) {
+      throw ApiException(
+        'Resposta de login Google sem tokens. Campos recebidos: ${data.keys.join(', ')}',
+      );
+    }
+    await _tokens.saveTokens(accessToken: access, refreshToken: refresh);
+    final user = await me().catchError(
+      (_) => UserProfile(
+        uuid: jsonText(data, 'uuid'),
+        userName: jsonText(data, 'userName'),
+        email: fallbackEmail,
+        profileImageUrl: jsonNullableText(data, 'profileImageUrl'),
+        description: jsonNullableText(data, 'description'),
+        roles: jsonStringList(data, 'roles'),
+        active: jsonBool(data, 'active', fallback: true),
+      ),
+    );
+    return AuthSession(accessToken: access, refreshToken: refresh, user: user);
   }
 }
 
@@ -236,8 +288,16 @@ class AuthController extends StateNotifier<AsyncValue<UserProfile?>> {
   Future<void> google() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      await _repository.signInWithGoogle();
-      return _repository.me();
+      final session = await _repository.signInWithGoogle();
+      return session.user;
+    });
+  }
+
+  Future<void> googleAccount(GoogleSignInAccount account) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final session = await _repository.signInWithGoogleAccount(account);
+      return session.user;
     });
   }
 

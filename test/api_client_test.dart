@@ -193,6 +193,42 @@ void main() {
     },
   );
 
+  test(
+    'does not refresh or expire the session for google login 401s',
+    () async {
+      await tokenStore.saveTokens(
+        accessToken: 'existing-access',
+        refreshToken: 'existing-refresh',
+      );
+
+      final dio = _testDio([
+        (options) {
+          expect(options.path, '/users/google');
+          return _jsonResponse({'message': 'Unauthorized'}, 401);
+        },
+      ]);
+
+      var sessionExpiredSignals = 0;
+      final api = ApiClient(
+        tokenStore,
+        onSessionExpired: () => sessionExpiredSignals++,
+        dio: dio,
+      );
+
+      await expectLater(
+        api.post<Map<String, dynamic>>(
+          '/users/google',
+          data: {'idToken': 'bad-token'},
+        ),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(await tokenStore.readAccessToken(), 'existing-access');
+      expect(await tokenStore.readRefreshToken(), 'existing-refresh');
+      expect(sessionExpiredSignals, 0);
+    },
+  );
+
   test('clears the local session when refresh fails', () async {
     await tokenStore.saveTokens(
       accessToken: 'expired-access',

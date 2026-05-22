@@ -192,6 +192,7 @@ class ApiClient {
 
   bool _isPublicPath(String path) {
     return path == '/users/login' ||
+        path == '/users/google' ||
         path == '/users/register' ||
         path == '/users/refresh' ||
         path == '/users/logout';
