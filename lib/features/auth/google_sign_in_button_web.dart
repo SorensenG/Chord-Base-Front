@@ -8,12 +8,45 @@ class GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: loading,
-      child: Opacity(
-        opacity: loading ? 0.55 : 1,
-        child: SizedBox(height: 44, child: Center(child: web.renderButton())),
-      ),
+    if (loading) {
+      return SizedBox(
+        height: 52,
+        child: OutlinedButton.icon(
+          onPressed: null,
+          icon: const Icon(Icons.g_mobiledata, size: 28),
+          label: const Text('Continuar com Google'),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.clamp(240.0, 400.0);
+
+        return SizedBox(
+          height: 52,
+          child: Center(
+            child: SizedBox(
+              width: width,
+              height: 40,
+              child: ClipRect(
+                child: web.renderButton(
+                  configuration: web.GSIButtonConfiguration(
+                    type: web.GSIButtonType.standard,
+                    theme: web.GSIButtonTheme.outline,
+                    size: web.GSIButtonSize.large,
+                    text: web.GSIButtonText.continueWith,
+                    shape: web.GSIButtonShape.rectangular,
+                    logoAlignment: web.GSIButtonLogoAlignment.left,
+                    minimumWidth: width,
+                    locale: 'pt-BR',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
