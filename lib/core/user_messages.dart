@@ -122,6 +122,15 @@ String? _messageFromRawText(String text) {
       normalized.contains('nao foi possivel ler a imagem')) {
     return 'Não consegui abrir essa imagem. Se for HEIC/HEIF, confira se o arquivo não está corrompido ou envie JPG/PNG.';
   }
+  if (normalized.contains('ocr_busy') ||
+      normalized.contains('processamento de imagens está ocupado') ||
+      normalized.contains('processamento de imagens esta ocupado')) {
+    return 'Outra imagem está sendo processada. Tente novamente em instantes.';
+  }
+  if (normalized.contains('image_dimensions_too_large') ||
+      normalized.contains('grande demais para processamento seguro')) {
+    return 'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.';
+  }
   if (normalized.contains('não consegui identificar uma cifra') ||
       normalized.contains('nao consegui identificar uma cifra') ||
       normalized.contains('imagem sem cifra') ||

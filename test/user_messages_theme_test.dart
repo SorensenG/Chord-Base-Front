@@ -95,6 +95,34 @@ void main() {
       userMessage(const ApiException('UPLOAD_TOO_LARGE', statusCode: 400)),
       chordUploadTooLargeMessage,
     );
+    expect(
+      userMessage(const ApiException('OCR_BUSY', statusCode: 422)),
+      'Outra imagem está sendo processada. Tente novamente em instantes.',
+    );
+    expect(
+      userMessage(
+        const ApiException(
+          'O processamento de imagens está ocupado. Tente novamente em instantes.',
+          statusCode: 400,
+        ),
+      ),
+      'Outra imagem está sendo processada. Tente novamente em instantes.',
+    );
+    expect(
+      userMessage(
+        const ApiException('IMAGE_DIMENSIONS_TOO_LARGE', statusCode: 422),
+      ),
+      'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.',
+    );
+    expect(
+      userMessage(
+        const ApiException(
+          'A imagem é grande demais para processamento seguro. Envie uma foto menor ou um PDF.',
+          statusCode: 400,
+        ),
+      ),
+      'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.',
+    );
   });
 
   test('resolves chord upload content types', () {
