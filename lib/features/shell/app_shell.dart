@@ -130,12 +130,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   void _openChords() {
+    ref.read(chordLibraryTabProvider.notifier).state = ChordLibraryTab.mine;
     ref.read(chordLibraryFilterProvider.notifier).state =
         ChordLibraryFilter.all;
     setState(() => _index = 1);
   }
 
   void _openReviewChords() {
+    ref.read(chordLibraryTabProvider.notifier).state = ChordLibraryTab.mine;
     ref.read(chordLibraryFilterProvider.notifier).state =
         ChordLibraryFilter.review;
     setState(() => _index = 1);

@@ -1186,10 +1186,27 @@ class _AddChordSheetState extends ConsumerState<_AddChordSheet> {
   }
 
   Future<List<ChordSummary>> _loadPublishedChords([String query = '']) async {
-    final items = query.isEmpty
-        ? await ref.read(chordsRepositoryProvider).mine()
-        : await ref.read(chordsRepositoryProvider).search(query);
-    return items.where((item) => item.isPublished).toList();
+    final repository = ref.read(chordsRepositoryProvider);
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      final items = await repository.mine();
+      return items.where((item) => item.isPublished).toList();
+    }
+
+    final results = await Future.wait([
+      repository.mine(),
+      repository.search(query),
+    ]);
+    final personalMatches = results.first.where(
+      (item) =>
+          item.isPublished &&
+          (item.chordName.toLowerCase().contains(normalizedQuery) ||
+              item.artist.toLowerCase().contains(normalizedQuery)),
+    );
+    return {
+      for (final item in [...personalMatches, ...results.last])
+        if (item.isPublished) item.uuid: item,
+    }.values.toList();
   }
 
   Future<void> _importNewChord() async {

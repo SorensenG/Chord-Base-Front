@@ -36,6 +36,14 @@ class HomeScreen extends ConsumerWidget {
     final invites = ref.watch(_invitesProvider);
     final chords = ref.watch(myChordsProvider);
     final recent = ref.watch(recentActivityProvider);
+    final pendingValue = invites.maybeWhen(
+      data: (pendingInvites) => chords.maybeWhen(
+        data: (items) =>
+            '${pendingInvites.length + items.where((item) => item.status != 'PUBLISHED').length}',
+        orElse: () => '-',
+      ),
+      orElse: () => '-',
+    );
     final compact = MediaQuery.sizeOf(context).width < 640;
     return AppScaffold(
       body: SafeArea(
@@ -161,13 +169,10 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _Metric(
-                        key: const ValueKey('home-metric-invites'),
-                        icon: Icons.group_add_rounded,
-                        label: 'Convites',
-                        value: invites.maybeWhen(
-                          data: (items) => '${items.length}',
-                          orElse: () => '-',
-                        ),
+                        key: const ValueKey('home-metric-pending'),
+                        icon: Icons.pending_actions_rounded,
+                        label: 'Pendencias',
+                        value: pendingValue,
                         color: AppColors.blue,
                         width: double.infinity,
                         onTap: () => _showNotifications(context, ref),
@@ -203,13 +208,10 @@ class HomeScreen extends ConsumerWidget {
                       onTap: onOpenSetlists,
                     ),
                     _Metric(
-                      key: const ValueKey('home-metric-invites'),
-                      icon: Icons.group_add_rounded,
-                      label: 'Convites',
-                      value: invites.maybeWhen(
-                        data: (items) => '${items.length}',
-                        orElse: () => '-',
-                      ),
+                      key: const ValueKey('home-metric-pending'),
+                      icon: Icons.pending_actions_rounded,
+                      label: 'Pendencias',
+                      value: pendingValue,
                       color: AppColors.blue,
                       onTap: () => _showNotifications(context, ref),
                     ),

@@ -2,10 +2,12 @@ import 'package:chordbase/core/api_client.dart';
 import 'package:chordbase/core/models.dart';
 import 'package:chordbase/core/theme.dart';
 import 'package:chordbase/core/token_store.dart';
+import 'package:chordbase/core/tutorial.dart';
 import 'package:chordbase/features/chords/chords_repository.dart';
 import 'package:chordbase/features/chords/chords_screen.dart';
 import 'package:chordbase/features/setlists/setlists_repository.dart';
 import 'package:chordbase/features/setlists/setlists_screen.dart';
+import 'package:chordbase/features/shell/app_shell.dart';
 import 'package:chordbase/features/shell/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,18 +51,29 @@ void main() {
     expect(chordsOpened, isTrue);
     expect(setlistsOpened, isTrue);
 
-    await tester.tap(find.byKey(const ValueKey('home-metric-invites')));
+    expect(find.text('Pendencias'), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('home-metric-pending')),
+        matching: find.text('2'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('home-metric-pending')));
     await tester.pumpAndSettle();
     expect(
       find.text('Convites e cifras que precisam de revisao.'),
       findsOneWidget,
     );
+    expect(find.text('Ensaio'), findsOneWidget);
+    expect(find.text('Cifra em revisao'), findsOneWidget);
   });
 
-  testWidgets('chords screen identifies personal and global libraries', (
+  testWidgets('chords screen separates personal and external libraries', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(1024, 900));
+    await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -76,8 +89,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Minhas cifras'), findsOneWidget);
     expect(find.text('Suas cifras'), findsOneWidget);
-    expect(find.text('Buscar cifras publicadas'), findsOneWidget);
+    expect(find.text('Todas'), findsOneWidget);
+    expect(find.text('Publicadas'), findsOneWidget);
+    expect(find.text('Revisar'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.tap(find.text('Cifras de outros usuarios'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Buscar cifras publicas de outros usuarios'),
+      findsOneWidget,
+    );
+    expect(find.text('Todas'), findsNothing);
+    expect(find.text('Publicadas'), findsNothing);
+    expect(find.text('Revisar'), findsNothing);
 
     await tester.enterText(find.byType(TextField).first, 'vento');
     await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
@@ -85,6 +113,42 @@ void main() {
 
     expect(find.text('Cifras publicadas encontradas'), findsOneWidget);
     expect(find.text('Revisar'), findsNothing);
+  });
+
+  testWidgets('pending review opens personal chords filtered for review', (
+    tester,
+  ) async {
+    FlutterSecureStorage.setMockInitialValues({
+      TutorialController.storageKey: 'true',
+    });
+    await tester.binding.setSurfaceSize(const Size(1024, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chordsRepositoryProvider.overrideWithValue(_FakeChordsRepository()),
+          setlistsRepositoryProvider.overrideWithValue(
+            _FakeSetlistsRepository(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: const AppShell(user: _user),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('home-metric-pending')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cifra em revisao').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Minhas cifras'), findsOneWidget);
+    expect(find.text('Revisar'), findsOneWidget);
+    expect(find.text('Cifra em revisao'), findsOneWidget);
+    expect(find.text('Cifra publicada'), findsNothing);
   });
 
   testWidgets('empty setlist offers published selection and new import', (
@@ -117,6 +181,13 @@ void main() {
     expect(find.text('Suas cifras publicadas'), findsOneWidget);
     expect(find.text('Cifra publicada'), findsOneWidget);
     expect(find.text('Cifra em revisao'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).last, 'Cifra');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cifras publicadas encontradas'), findsOneWidget);
+    expect(find.text('Cifra publicada'), findsOneWidget);
   });
 }
 
@@ -177,7 +248,15 @@ class _FakeSetlistsRepository extends SetlistsRepository {
   Future<List<Setlist>> mine() async => const [];
 
   @override
-  Future<List<SetlistInvite>> invites() async => const [];
+  Future<List<SetlistInvite>> invites() async => const [
+    SetlistInvite(
+      inviteUuid: 'invite-1',
+      status: 'PENDING',
+      setlistUuid: 'setlist-1',
+      setlistName: 'Ensaio',
+      ownerUserName: 'outra-pessoa',
+    ),
+  ];
 }
 
 class _UnusedApiClient extends ApiClient {

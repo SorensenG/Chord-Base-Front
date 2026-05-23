@@ -21,12 +21,25 @@ final chordLibraryFilterProvider = StateProvider<ChordLibraryFilter>((ref) {
   return ChordLibraryFilter.all;
 });
 
+final chordLibraryTabProvider = StateProvider<ChordLibraryTab>((ref) {
+  return ChordLibraryTab.mine;
+});
+
 enum ChordLibraryFilter {
   all('Todas'),
   published('Publicadas'),
   review('Revisar');
 
   const ChordLibraryFilter(this.label);
+
+  final String label;
+}
+
+enum ChordLibraryTab {
+  mine('Minhas cifras'),
+  others('Cifras de outros usuarios');
+
+  const ChordLibraryTab(this.label);
 
   final String label;
 }
@@ -139,6 +152,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
   @override
   Widget build(BuildContext context) {
     final normalizedQuery = _query.trim();
+    final tab = ref.watch(chordLibraryTabProvider);
     final filter = ref.watch(chordLibraryFilterProvider);
     final myChords = ref.watch(myChordsProvider);
     final result = ref.watch(chordSearchProvider(normalizedQuery));
@@ -151,48 +165,67 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
         children: [
           PageHeader(
             title: 'Cifras',
-            subtitle:
-                'Suas cifras aparecem abaixo. Pesquise para encontrar cifras publicadas de outros usuarios.',
-            actions: [
-              FilledButton.icon(
-                onPressed: _upload,
-                icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Importar'),
-              ),
-            ],
+            subtitle: tab == ChordLibraryTab.mine
+                ? 'Gerencie suas cifras importadas e revise publicacoes pendentes.'
+                : 'Pesquise cifras publicadas por outras pessoas.',
+            actions: tab == ChordLibraryTab.mine
+                ? [
+                    FilledButton.icon(
+                      onPressed: _upload,
+                      icon: const Icon(Icons.upload_file_rounded),
+                      label: const Text('Importar'),
+                    ),
+                  ]
+                : [],
           ),
           const SizedBox(height: 18),
-          TextField(
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (value) => setState(() => _query = value),
-            decoration: InputDecoration(
-              labelText: 'Buscar cifras publicadas',
-              hintText: 'Musica de outros usuarios',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: IconButton(
-                onPressed: () => setState(() => _query = _search.text),
-                icon: const Icon(Icons.arrow_forward_rounded),
-              ),
-            ),
+          SegmentedButton<ChordLibraryTab>(
+            segments: [
+              for (final option in ChordLibraryTab.values)
+                ButtonSegment<ChordLibraryTab>(
+                  value: option,
+                  label: Text(option.label),
+                ),
+            ],
+            selected: {tab},
+            onSelectionChanged: (selection) {
+              ref.read(chordLibraryTabProvider.notifier).state =
+                  selection.single;
+            },
           ),
-          if (normalizedQuery.isEmpty) ...[
+          if (tab == ChordLibraryTab.mine) ...[
             const SizedBox(height: 14),
             ActionToolbar(
               children: [
-                for (final filter in ChordLibraryFilter.values)
+                for (final option in ChordLibraryFilter.values)
                   ChoiceChip(
-                    label: Text(filter.label),
-                    selected: ref.watch(chordLibraryFilterProvider) == filter,
+                    label: Text(option.label),
+                    selected: filter == option,
                     onSelected: (_) =>
                         ref.read(chordLibraryFilterProvider.notifier).state =
-                            filter,
+                            option,
                   ),
               ],
             ),
+          ] else ...[
+            const SizedBox(height: 18),
+            TextField(
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (value) => setState(() => _query = value),
+              decoration: InputDecoration(
+                labelText: 'Buscar cifras publicas de outros usuarios',
+                hintText: 'Nome da musica',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _query = _search.text),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: 22),
-          if (normalizedQuery.isEmpty)
+          if (tab == ChordLibraryTab.mine)
             myChords.when(
               loading: () => const LinearProgressIndicator(),
               error: (error, _) => EmptyState(
@@ -221,6 +254,12 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                   isAdmin: isAdmin,
                 );
               },
+            )
+          else if (normalizedQuery.isEmpty)
+            const EmptyState(
+              icon: Icons.search_rounded,
+              title: 'Busque cifras de outros usuarios',
+              message: 'Informe uma musica para encontrar cifras publicadas.',
             )
           else
             result.when(
@@ -269,7 +308,7 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
   }
 
   Future<void> _upload() async {
-    await runChordImportFlow(context, ref, refreshSearchQuery: _query);
+    await runChordImportFlow(context, ref);
   }
 
   Future<void> _openChord(String uuid) async {
