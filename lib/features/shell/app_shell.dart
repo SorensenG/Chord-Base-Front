@@ -57,6 +57,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           onImportChord: _importChord,
           onCreateSetlist: _createSetlist,
           onOpenChords: _openChords,
+          onOpenSetlists: _openSetlists,
           onReviewChords: _openReviewChords,
         ),
       ),
@@ -138,6 +139,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.read(chordLibraryFilterProvider.notifier).state =
         ChordLibraryFilter.review;
     setState(() => _index = 1);
+  }
+
+  void _openSetlists() {
+    setState(() => _index = 2);
   }
 
   void _importChord() {

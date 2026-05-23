@@ -521,10 +521,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         icon: const Icon(Icons.play_circle_outline_rounded),
                         label: const Text('Modo palco'),
                       ),
-                      OutlinedButton.icon(
+                      FilledButton.tonalIcon(
                         onPressed: _addChord,
                         icon: const Icon(Icons.library_add_rounded),
-                        label: const Text('Adicionar'),
+                        label: const Text('Adicionar cifra'),
                       ),
                       IconButton(
                         tooltip: 'Editar setlist',
@@ -546,44 +546,46 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             ),
           ),
           Expanded(
-            child: ReorderableListView.builder(
-              padding: EdgeInsets.fromLTRB(
-                compact ? 16 : 24,
-                8,
-                compact ? 16 : 24,
-                compact ? 104 : 24,
-              ),
-              itemCount: _setlist.chords.length,
-              onReorder: (oldIndex, newIndex) async {
-                if (newIndex > oldIndex) newIndex -= 1;
-                final chords = [..._setlist.chords];
-                final moved = chords.removeAt(oldIndex);
-                chords.insert(newIndex, moved);
-                final updated = await ref
-                    .read(setlistsRepositoryProvider)
-                    .reorder(_setlist.uuid, chords);
-                setState(() => _setlist = updated);
-              },
-              itemBuilder: (_, index) {
-                final chord = _setlist.chords[index];
-                return _SetlistChordRow(
-                  key: ValueKey(chord.uuid),
-                  chord: chord,
-                  index: index,
-                  onOpen: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ChordPlayerLoader(uuid: chord.uuid),
+            child: _setlist.chords.isEmpty
+                ? _EmptySetlist(onAddChord: _addChord)
+                : ReorderableListView.builder(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 16 : 24,
+                      8,
+                      compact ? 16 : 24,
+                      compact ? 104 : 24,
                     ),
+                    itemCount: _setlist.chords.length,
+                    onReorder: (oldIndex, newIndex) async {
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      final chords = [..._setlist.chords];
+                      final moved = chords.removeAt(oldIndex);
+                      chords.insert(newIndex, moved);
+                      final updated = await ref
+                          .read(setlistsRepositoryProvider)
+                          .reorder(_setlist.uuid, chords);
+                      setState(() => _setlist = updated);
+                    },
+                    itemBuilder: (_, index) {
+                      final chord = _setlist.chords[index];
+                      return _SetlistChordRow(
+                        key: ValueKey(chord.uuid),
+                        chord: chord,
+                        index: index,
+                        onOpen: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChordPlayerLoader(uuid: chord.uuid),
+                          ),
+                        ),
+                        onDelete: () async {
+                          final updated = await ref
+                              .read(setlistsRepositoryProvider)
+                              .removeChord(_setlist.uuid, chord.uuid);
+                          setState(() => _setlist = updated);
+                        },
+                      );
+                    },
                   ),
-                  onDelete: () async {
-                    final updated = await ref
-                        .read(setlistsRepositoryProvider)
-                        .removeChord(_setlist.uuid, chord.uuid);
-                    setState(() => _setlist = updated);
-                  },
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -739,11 +741,61 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       isScrollControlled: true,
       builder: (context) => _AddChordSheet(
         setlistUuid: _setlist.uuid,
-        onAdded: (updated) {
+        onAdded: (updated, imported) {
           if (!mounted) return;
           setState(() => _setlist = updated);
           ref.invalidate(setlistsProvider);
+          if (imported) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Cifra criada e adicionada a setlist.'),
+              ),
+            );
+          }
         },
+      ),
+    );
+  }
+}
+
+class _EmptySetlist extends StatelessWidget {
+  const _EmptySetlist({required this.onAddChord});
+
+  final VoidCallback onAddChord;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.queue_music_rounded,
+              size: 42,
+              color: AppColors.teal,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Sua setlist esta vazia',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Busque uma cifra existente ou importe um arquivo novo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.muted),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onAddChord,
+              icon: const Icon(Icons.library_add_rounded),
+              label: const Text('Adicionar cifra'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -982,7 +1034,7 @@ class _AddChordSheet extends ConsumerStatefulWidget {
   const _AddChordSheet({required this.setlistUuid, required this.onAdded});
 
   final String setlistUuid;
-  final ValueChanged<Setlist> onAdded;
+  final void Function(Setlist, bool imported) onAdded;
 
   @override
   ConsumerState<_AddChordSheet> createState() => _AddChordSheetState();
@@ -997,7 +1049,7 @@ class _AddChordSheetState extends ConsumerState<_AddChordSheet> {
   @override
   void initState() {
     super.initState();
-    _results = ref.read(chordsRepositoryProvider).mine();
+    _results = _loadPublishedChords();
   }
 
   @override
@@ -1023,6 +1075,26 @@ class _AddChordSheetState extends ConsumerState<_AddChordSheet> {
           Text(
             'Adicionar cifra',
             style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Escolha uma cifra publicada ou importe um arquivo novo.',
+            style: TextStyle(color: context.appColors.muted),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _importNewChord,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text('Importar nova cifra'),
+          ),
+          const SizedBox(height: 18),
+          SectionHeader(
+            title: _activeQuery.isEmpty
+                ? 'Suas cifras publicadas'
+                : 'Cifras publicadas encontradas',
+            subtitle: _activeQuery.isEmpty
+                ? 'Toque para adicionar a setlist.'
+                : 'Resultados disponiveis para adicionar.',
           ),
           const SizedBox(height: 12),
           TextField(
@@ -1109,17 +1181,40 @@ class _AddChordSheetState extends ConsumerState<_AddChordSheet> {
     final query = _query.text.trim();
     setState(() {
       _activeQuery = query;
-      _results = query.isEmpty
-          ? ref.read(chordsRepositoryProvider).mine()
-          : ref.read(chordsRepositoryProvider).search(query);
+      _results = _loadPublishedChords(query);
     });
   }
 
-  Future<void> _addChord(String chordUuid) async {
-    final updated = await ref
-        .read(setlistsRepositoryProvider)
-        .addChord(widget.setlistUuid, chordUuid);
-    widget.onAdded(updated);
-    if (mounted) Navigator.pop(context);
+  Future<List<ChordSummary>> _loadPublishedChords([String query = '']) async {
+    final items = query.isEmpty
+        ? await ref.read(chordsRepositoryProvider).mine()
+        : await ref.read(chordsRepositoryProvider).search(query);
+    return items.where((item) => item.isPublished).toList();
+  }
+
+  Future<void> _importNewChord() async {
+    final uuid = await runChordImportFlow(
+      context,
+      ref,
+      refreshSearchQuery: _activeQuery,
+      showSuccessMessage: false,
+    );
+    if (uuid == null || !mounted) return;
+    await _addChord(uuid, imported: true);
+  }
+
+  Future<void> _addChord(String chordUuid, {bool imported = false}) async {
+    try {
+      final updated = await ref
+          .read(setlistsRepositoryProvider)
+          .addChord(widget.setlistUuid, chordUuid);
+      widget.onAdded(updated, imported);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(userMessage(error))));
+    }
   }
 }

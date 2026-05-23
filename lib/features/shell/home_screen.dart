@@ -19,6 +19,7 @@ class HomeScreen extends ConsumerWidget {
     required this.onImportChord,
     required this.onCreateSetlist,
     required this.onOpenChords,
+    required this.onOpenSetlists,
     required this.onReviewChords,
   });
 
@@ -26,6 +27,7 @@ class HomeScreen extends ConsumerWidget {
   final VoidCallback onImportChord;
   final VoidCallback onCreateSetlist;
   final VoidCallback onOpenChords;
+  final VoidCallback onOpenSetlists;
   final VoidCallback onReviewChords;
 
   @override
@@ -129,6 +131,7 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: _Metric(
+                        key: const ValueKey('home-metric-chords'),
                         icon: Icons.library_music_rounded,
                         label: 'Cifras',
                         value: chords.maybeWhen(
@@ -137,11 +140,13 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         color: AppColors.teal,
                         width: double.infinity,
+                        onTap: onOpenChords,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _Metric(
+                        key: const ValueKey('home-metric-setlists'),
                         icon: Icons.queue_music_rounded,
                         label: 'Setlists',
                         value: setlists.maybeWhen(
@@ -150,11 +155,13 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         color: AppColors.gold,
                         width: double.infinity,
+                        onTap: onOpenSetlists,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _Metric(
+                        key: const ValueKey('home-metric-invites'),
                         icon: Icons.group_add_rounded,
                         label: 'Convites',
                         value: invites.maybeWhen(
@@ -163,6 +170,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         color: AppColors.blue,
                         width: double.infinity,
+                        onTap: () => _showNotifications(context, ref),
                       ),
                     ),
                   ],
@@ -173,6 +181,7 @@ class HomeScreen extends ConsumerWidget {
                   runSpacing: 12,
                   children: [
                     _Metric(
+                      key: const ValueKey('home-metric-chords'),
                       icon: Icons.library_music_rounded,
                       label: 'Cifras',
                       value: chords.maybeWhen(
@@ -180,8 +189,10 @@ class HomeScreen extends ConsumerWidget {
                         orElse: () => '-',
                       ),
                       color: AppColors.teal,
+                      onTap: onOpenChords,
                     ),
                     _Metric(
+                      key: const ValueKey('home-metric-setlists'),
                       icon: Icons.queue_music_rounded,
                       label: 'Setlists',
                       value: setlists.maybeWhen(
@@ -189,8 +200,10 @@ class HomeScreen extends ConsumerWidget {
                         orElse: () => '-',
                       ),
                       color: AppColors.gold,
+                      onTap: onOpenSetlists,
                     ),
                     _Metric(
+                      key: const ValueKey('home-metric-invites'),
                       icon: Icons.group_add_rounded,
                       label: 'Convites',
                       value: invites.maybeWhen(
@@ -198,6 +211,7 @@ class HomeScreen extends ConsumerWidget {
                         orElse: () => '-',
                       ),
                       color: AppColors.blue,
+                      onTap: () => _showNotifications(context, ref),
                     ),
                   ],
                 ),
@@ -312,10 +326,12 @@ final _invitesProvider = FutureProvider.autoDispose((ref) {
 
 class _Metric extends StatelessWidget {
   const _Metric({
+    super.key,
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    required this.onTap,
     this.width = 112,
   });
 
@@ -323,32 +339,39 @@ class _Metric extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final VoidCallback onTap;
   final double width;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      width: width,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surface2,
+    return Material(
+      color: colors.surface2,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: colors.line),
+        side: BorderSide(color: colors.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        onTap: onTap,
+        child: Container(
+          width: width,
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              Text(label, style: TextStyle(color: colors.muted, fontSize: 12)),
+            ],
           ),
-          Text(label, style: TextStyle(color: colors.muted, fontSize: 12)),
-        ],
+        ),
       ),
     );
   }

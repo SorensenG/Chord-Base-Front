@@ -35,6 +35,7 @@ Future<String?> runChordImportFlow(
   BuildContext context,
   WidgetRef ref, {
   String? refreshSearchQuery,
+  bool showSuccessMessage = true,
 }) async {
   final file = await FilePicker.platform.pickFiles(
     withData: true,
@@ -88,19 +89,23 @@ Future<String?> runChordImportFlow(
       ref.invalidate(chordSearchProvider(query));
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Cifra adicionada.'),
-        action: SnackBarAction(
-          label: 'Abrir',
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ChordPlayerLoader(uuid: uuid)),
-            );
-          },
+    if (showSuccessMessage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Cifra adicionada.'),
+          action: SnackBarAction(
+            label: 'Abrir',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChordPlayerLoader(uuid: uuid),
+                ),
+              );
+            },
+          ),
         ),
-      ),
-    );
+      );
+    }
     return uuid;
   } catch (error) {
     if (!context.mounted) return null;
@@ -146,7 +151,8 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
         children: [
           PageHeader(
             title: 'Cifras',
-            subtitle: 'Importe, revise e encontre musicas para tocar.',
+            subtitle:
+                'Suas cifras aparecem abaixo. Pesquise para encontrar cifras publicadas de outros usuarios.',
             actions: [
               FilledButton.icon(
                 onPressed: _upload,
@@ -161,8 +167,8 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
             textInputAction: TextInputAction.search,
             onSubmitted: (value) => setState(() => _query = value),
             decoration: InputDecoration(
-              labelText: 'Buscar cifra',
-              hintText: 'Nome da musica',
+              labelText: 'Buscar cifras publicadas',
+              hintText: 'Musica de outros usuarios',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: IconButton(
                 onPressed: () => setState(() => _query = _search.text),
@@ -170,19 +176,21 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
-          ActionToolbar(
-            children: [
-              for (final filter in ChordLibraryFilter.values)
-                ChoiceChip(
-                  label: Text(filter.label),
-                  selected: ref.watch(chordLibraryFilterProvider) == filter,
-                  onSelected: (_) =>
-                      ref.read(chordLibraryFilterProvider.notifier).state =
-                          filter,
-                ),
-            ],
-          ),
+          if (normalizedQuery.isEmpty) ...[
+            const SizedBox(height: 14),
+            ActionToolbar(
+              children: [
+                for (final filter in ChordLibraryFilter.values)
+                  ChoiceChip(
+                    label: Text(filter.label),
+                    selected: ref.watch(chordLibraryFilterProvider) == filter,
+                    onSelected: (_) =>
+                        ref.read(chordLibraryFilterProvider.notifier).state =
+                            filter,
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 22),
           if (normalizedQuery.isEmpty)
             myChords.when(
@@ -199,12 +207,13 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                     icon: Icons.music_note_rounded,
                     title: 'Nenhuma cifra nesse filtro',
                     message:
-                        'Importe uma cifra ou altere os filtros para continuar.',
+                        'Importe sua primeira cifra ou altere os filtros para continuar.',
                   );
                 }
                 return _ChordSummaryList(
-                  title: 'Minha biblioteca',
-                  subtitle: '${filtered.length} cifra(s) encontradas',
+                  title: 'Suas cifras',
+                  subtitle:
+                      '${filtered.length} cifra(s) criadas ou importadas por voce',
                   items: filtered,
                   onOpen: _openChord,
                   onEdit: _editChord,
@@ -222,18 +231,18 @@ class _ChordsScreenState extends ConsumerState<ChordsScreen> {
                 message: userMessage(error),
               ),
               data: (items) {
-                final filtered = _applyFilter(items, filter);
-                if (filtered.isEmpty) {
+                if (items.isEmpty) {
                   return const EmptyState(
                     icon: Icons.search_off_rounded,
                     title: 'Nada encontrado',
-                    message: 'Tente outro nome ou envie a cifra.',
+                    message: 'Pesquise outro titulo ou importe uma cifra nova.',
                   );
                 }
                 return _ChordSummaryList(
-                  title: 'Resultado da busca',
-                  subtitle: '${filtered.length} resultado(s)',
-                  items: filtered,
+                  title: 'Cifras publicadas encontradas',
+                  subtitle:
+                      '${items.length} resultado(s) de usuarios do ChordBase',
+                  items: items,
                   onOpen: _openChord,
                   onEdit: isAdmin ? _editChord : null,
                   onDelete: isAdmin ? _deleteChord : null,
