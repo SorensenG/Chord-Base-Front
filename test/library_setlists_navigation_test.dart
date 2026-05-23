@@ -46,6 +46,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('PDF ou TXT'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('home-metric-chords')));
     await tester.tap(find.byKey(const ValueKey('home-metric-setlists')));
     expect(chordsOpened, isTrue);

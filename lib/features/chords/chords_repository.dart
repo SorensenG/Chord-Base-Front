@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/models.dart';
+import '../../core/user_messages.dart';
 
 final chordsRepositoryProvider = Provider<ChordsRepository>((ref) {
   return ChordsRepository(ref.watch(apiClientProvider));
@@ -57,6 +58,10 @@ class ChordsRepository {
   }
 
   Future<ChordPreview> preview(PlatformFile file) async {
+    if (!isSupportedChordImportFile(file)) {
+      throw const ApiException(chordDocumentsOnlyMessage, statusCode: 400);
+    }
+
     final contentType = _contentTypeFor(file.name);
     final multipart = file.bytes != null
         ? MultipartFile.fromBytes(
@@ -111,11 +116,6 @@ DioMediaType contentTypeForChordUpload(String filename) {
   return switch (extension) {
     'pdf' => DioMediaType.parse('application/pdf'),
     'txt' => DioMediaType.parse('text/plain'),
-    'png' => DioMediaType.parse('image/png'),
-    'jpg' || 'jpeg' => DioMediaType.parse('image/jpeg'),
-    'webp' => DioMediaType.parse('image/webp'),
-    'heic' => DioMediaType.parse('image/heic'),
-    'heif' => DioMediaType.parse('image/heif'),
     _ => DioMediaType.parse('application/octet-stream'),
   };
 }
@@ -125,4 +125,9 @@ DioMediaType _contentTypeFor(String filename) =>
 
 bool isChordUploadTooLarge(PlatformFile file) {
   return file.size > maxChordUploadSizeBytes;
+}
+
+bool isSupportedChordImportFile(PlatformFile file) {
+  final extension = file.name.split('.').last.toLowerCase();
+  return extension == 'pdf' || extension == 'txt';
 }

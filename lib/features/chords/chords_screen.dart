@@ -53,20 +53,17 @@ Future<String?> runChordImportFlow(
   final file = await FilePicker.platform.pickFiles(
     withData: true,
     type: FileType.custom,
-    allowedExtensions: [
-      'pdf',
-      'txt',
-      'png',
-      'jpg',
-      'jpeg',
-      'webp',
-      'heic',
-      'heif',
-    ],
+    allowedExtensions: ['pdf', 'txt'],
   );
   if (file == null || file.files.isEmpty || !context.mounted) return null;
 
   final selectedFile = file.files.single;
+  if (!isSupportedChordImportFile(selectedFile)) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text(chordDocumentsOnlyMessage)));
+    return null;
+  }
   if (isChordUploadTooLarge(selectedFile)) {
     ScaffoldMessenger.of(
       context,

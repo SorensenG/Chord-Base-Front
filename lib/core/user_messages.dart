@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'api_client.dart';
 
 const chordUploadTooLargeMessage =
-    'Arquivo muito grande. Envie uma foto menor ou reduza a qualidade da imagem.';
+    'Arquivo muito grande. Envie um PDF ou TXT menor.';
+const chordDocumentsOnlyMessage =
+    'A importação aceita apenas arquivos PDF ou TXT. Imagens não são suportadas no momento.';
 
 String userMessage(Object error, {String? fallback}) {
   if (error is ApiException) {
@@ -99,12 +101,12 @@ String? _messageFromRawText(String text) {
   if (normalized.contains('unsupported_extension') ||
       normalized.contains('extensão não suportada') ||
       normalized.contains('extensao nao suportada')) {
-    return 'Formato não suportado. Envie PDF, PNG, JPG, JPEG, WEBP, HEIC, HEIF ou TXT.';
+    return chordDocumentsOnlyMessage;
   }
   if (normalized.contains('unsupported_mime_type') ||
       normalized.contains('tipo de arquivo não suportado') ||
       normalized.contains('tipo de arquivo nao suportado')) {
-    return 'Tipo de arquivo não suportado. Tente PDF, imagem PNG/JPG/WEBP/HEIC/HEIF ou TXT.';
+    return chordDocumentsOnlyMessage;
   }
   if (normalized.contains('upload_too_large') ||
       normalized.contains('maximum upload size exceeded') ||
@@ -120,26 +122,28 @@ String? _messageFromRawText(String text) {
   if (normalized.contains('invalid_image') ||
       normalized.contains('não foi possível ler a imagem') ||
       normalized.contains('nao foi possivel ler a imagem')) {
-    return 'Não consegui abrir essa imagem. Se for HEIC/HEIF, confira se o arquivo não está corrompido ou envie JPG/PNG.';
+    return chordDocumentsOnlyMessage;
   }
   if (normalized.contains('ocr_busy') ||
       normalized.contains('processamento de imagens está ocupado') ||
-      normalized.contains('processamento de imagens esta ocupado')) {
-    return 'Outra imagem está sendo processada. Tente novamente em instantes.';
+      normalized.contains('processamento de imagens esta ocupado') ||
+      normalized.contains('processamento de documentos está ocupado') ||
+      normalized.contains('processamento de documentos esta ocupado')) {
+    return 'Outro documento está sendo processado. Aguarde um instante e tente novamente.';
   }
   if (normalized.contains('image_dimensions_too_large') ||
       normalized.contains('grande demais para processamento seguro')) {
-    return 'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.';
+    return chordDocumentsOnlyMessage;
   }
   if (normalized.contains('não consegui identificar uma cifra') ||
       normalized.contains('nao consegui identificar uma cifra') ||
       normalized.contains('imagem sem cifra') ||
       normalized.contains('sem sinais de cifra')) {
-    return 'Não consegui identificar uma cifra nessa imagem. Envie uma foto mais nítida, PDF ou TXT.';
+    return chordDocumentsOnlyMessage;
   }
   if (normalized.contains('não foi possível extrair texto') ||
       normalized.contains('nao foi possivel extrair texto')) {
-    return 'Não consegui ler texto nessa imagem. Tente uma imagem mais nítida ou envie PDF/TXT.';
+    return 'Não consegui ler texto desse arquivo. Tente um PDF com texto selecionável ou envie TXT.';
   }
   if (normalized.contains('only published chords can be added')) {
     return 'Só cifras publicadas podem entrar em setlists.';

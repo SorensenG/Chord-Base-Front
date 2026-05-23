@@ -84,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
                     QuickActionButton(
                       icon: Icons.upload_file_rounded,
                       label: 'Importar cifra',
-                      description: 'PDF, imagem ou TXT',
+                      description: 'PDF ou TXT',
                       fullWidth: true,
                       onTap: onImportChord,
                     ),
@@ -114,7 +114,7 @@ class HomeScreen extends ConsumerWidget {
                     QuickActionButton(
                       icon: Icons.upload_file_rounded,
                       label: 'Importar cifra',
-                      description: 'PDF, imagem ou TXT',
+                      description: 'PDF ou TXT',
                       onTap: onImportChord,
                     ),
                     QuickActionButton(

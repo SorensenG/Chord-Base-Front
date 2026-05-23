@@ -43,11 +43,11 @@ void main() {
   test('maps chord import upload errors to user-friendly messages', () {
     expect(
       userMessage(const ApiException('UNSUPPORTED_EXTENSION', statusCode: 400)),
-      'Formato não suportado. Envie PDF, PNG, JPG, JPEG, WEBP, HEIC, HEIF ou TXT.',
+      chordDocumentsOnlyMessage,
     );
     expect(
       userMessage(const ApiException('INVALID_IMAGE', statusCode: 422)),
-      'Não consegui abrir essa imagem. Se for HEIC/HEIF, confira se o arquivo não está corrompido ou envie JPG/PNG.',
+      chordDocumentsOnlyMessage,
     );
     expect(
       userMessage(
@@ -56,7 +56,7 @@ void main() {
           statusCode: 422,
         ),
       ),
-      'Não consegui identificar uma cifra nessa imagem. Envie uma foto mais nítida, PDF ou TXT.',
+      chordDocumentsOnlyMessage,
     );
     expect(
       userMessage(
@@ -65,7 +65,7 @@ void main() {
           statusCode: 422,
         ),
       ),
-      'Não consegui ler texto nessa imagem. Tente uma imagem mais nítida ou envie PDF/TXT.',
+      'Não consegui ler texto desse arquivo. Tente um PDF com texto selecionável ou envie TXT.',
     );
     expect(
       userMessage(
@@ -97,7 +97,7 @@ void main() {
     );
     expect(
       userMessage(const ApiException('OCR_BUSY', statusCode: 422)),
-      'Outra imagem está sendo processada. Tente novamente em instantes.',
+      'Outro documento está sendo processado. Aguarde um instante e tente novamente.',
     );
     expect(
       userMessage(
@@ -106,13 +106,22 @@ void main() {
           statusCode: 400,
         ),
       ),
-      'Outra imagem está sendo processada. Tente novamente em instantes.',
+      'Outro documento está sendo processado. Aguarde um instante e tente novamente.',
+    );
+    expect(
+      userMessage(
+        const ApiException(
+          'O processamento de documentos está ocupado. Tente novamente em instantes.',
+          statusCode: 400,
+        ),
+      ),
+      'Outro documento está sendo processado. Aguarde um instante e tente novamente.',
     );
     expect(
       userMessage(
         const ApiException('IMAGE_DIMENSIONS_TOO_LARGE', statusCode: 422),
       ),
-      'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.',
+      chordDocumentsOnlyMessage,
     );
     expect(
       userMessage(
@@ -121,31 +130,44 @@ void main() {
           statusCode: 400,
         ),
       ),
-      'Essa imagem é grande demais para processar com segurança. Envie uma foto menor ou um PDF.',
+      chordDocumentsOnlyMessage,
     );
   });
 
   test('resolves chord upload content types', () {
-    expect(contentTypeForChordUpload('song.heic').mimeType, 'image/heic');
-    expect(contentTypeForChordUpload('song.heif').mimeType, 'image/heif');
-    expect(contentTypeForChordUpload('song.jpg').mimeType, 'image/jpeg');
-    expect(contentTypeForChordUpload('song.jpeg').mimeType, 'image/jpeg');
-    expect(contentTypeForChordUpload('song.png').mimeType, 'image/png');
-    expect(contentTypeForChordUpload('song.webp').mimeType, 'image/webp');
     expect(contentTypeForChordUpload('song.pdf').mimeType, 'application/pdf');
     expect(contentTypeForChordUpload('song.txt').mimeType, 'text/plain');
+    expect(
+      contentTypeForChordUpload('song.jpg').mimeType,
+      'application/octet-stream',
+    );
+  });
+
+  test('accepts only PDF and TXT chord imports locally', () {
+    expect(
+      isSupportedChordImportFile(PlatformFile(name: 'song.pdf', size: 1)),
+      isTrue,
+    );
+    expect(
+      isSupportedChordImportFile(PlatformFile(name: 'song.TXT', size: 1)),
+      isTrue,
+    );
+    expect(
+      isSupportedChordImportFile(PlatformFile(name: 'song.jpg', size: 1)),
+      isFalse,
+    );
   });
 
   test('validates chord upload size locally', () {
     expect(
       isChordUploadTooLarge(
-        PlatformFile(name: 'photo.heic', size: maxChordUploadSizeBytes + 1),
+        PlatformFile(name: 'song.pdf', size: maxChordUploadSizeBytes + 1),
       ),
       isTrue,
     );
     expect(
       isChordUploadTooLarge(
-        PlatformFile(name: 'photo.heic', size: maxChordUploadSizeBytes),
+        PlatformFile(name: 'song.pdf', size: maxChordUploadSizeBytes),
       ),
       isFalse,
     );
