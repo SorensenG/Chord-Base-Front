@@ -30,6 +30,7 @@ void showUserMessage(BuildContext context, Object error, {String? fallback}) {
 String? _messageFromApiException(ApiException error) {
   final raw = error.message;
   final normalized = raw.toLowerCase();
+  final mappedRaw = _messageFromRawText(raw);
 
   if (error.statusCode == 401) {
     if (normalized.contains('sessao') || normalized.contains('session')) {
@@ -46,11 +47,17 @@ String? _messageFromApiException(ApiException error) {
   if (error.statusCode == 413) {
     return chordUploadTooLargeMessage;
   }
+  if (mappedRaw != null) {
+    return mappedRaw;
+  }
+  if (error.statusCode == 429 || error.statusCode == 503) {
+    return 'O processamento está temporariamente indisponível. Tente novamente em instantes.';
+  }
   if (error.statusCode != null && error.statusCode! >= 500) {
     return 'A API encontrou um problema. Tente novamente em instantes.';
   }
 
-  return _messageFromRawText(raw);
+  return null;
 }
 
 String _messageFromDio(DioException error) {

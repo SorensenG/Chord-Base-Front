@@ -8,6 +8,7 @@ import 'package:chordbase/features/chords/chords_repository.dart';
 import 'package:chordbase/features/shell/app_shell.dart';
 import 'package:chordbase/shared/widgets/app_layout.dart';
 import 'package:chordbase/shared/widgets/app_logo.dart';
+import 'package:chordbase/shared/widgets/profile_avatar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,6 +101,10 @@ void main() {
       'Outro documento está sendo processado. Aguarde um instante e tente novamente.',
     );
     expect(
+      userMessage(const ApiException('OCR_BUSY', statusCode: 503)),
+      'Outro documento está sendo processado. Aguarde um instante e tente novamente.',
+    );
+    expect(
       userMessage(
         const ApiException(
           'O processamento de imagens está ocupado. Tente novamente em instantes.',
@@ -131,6 +136,14 @@ void main() {
         ),
       ),
       chordDocumentsOnlyMessage,
+    );
+  });
+
+  test('does not load arbitrary external profile avatar URLs', () {
+    expect(profileImageProvider('https://attacker.example/track.png'), isNull);
+    expect(
+      profileImageProvider('https://lh3.googleusercontent.com/avatar'),
+      isA<NetworkImage>(),
     );
   });
 

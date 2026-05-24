@@ -59,7 +59,10 @@ ImageProvider? profileImageProvider(String? value) {
       return null;
     }
   }
-  return NetworkImage(text);
+  if (text.startsWith('https://lh3.googleusercontent.com/')) {
+    return NetworkImage(text);
+  }
+  return null;
 }
 
 Future<String?> pickProfileImageDataUrl() async {

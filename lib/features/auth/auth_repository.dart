@@ -76,7 +76,6 @@ class AuthRepository {
         'userName': userName,
         'email': email,
         'password': password,
-        'role': 'ROLE_USER',
         'profileImageUrl': profileImageUrl,
         'description': description,
       },
